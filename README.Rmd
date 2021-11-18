@@ -4,8 +4,10 @@ output: md_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
+
+## Overview
 
 Investigating mesh attributes in fitting LGCPs using the INLA-SPDE approach.
 
@@ -55,8 +57,7 @@ text(iO[1],iO[2] - 0.1, labels = expression( italic("c")), col = "grey")
 ```
 
 
-
-## Overview
+**Note**: The radius-edge ratio of a plolygon $\tau$ is given by $re = \frac{R}{l_{\text{min}}}$, where R is the circumradius and $l_{\text{min}}$ is the length of the shortest edge. The radius ratio $rr = \frac{r}{R}$, where $r$ is the inradius.
 
 ## Files
 
@@ -65,5 +66,7 @@ text(iO[1],iO[2] - 0.1, labels = expression( italic("c")), col = "grey")
      
      + `edges` a dataframe of mesh segments  
      + `triangles` a dataframe with, for each triangle in the triangulation, the circumcircle and incircle radii,
-     the assocoated centroid locations, and the radius-edge ratio & radius ratio,
-     + angles` is a 3 x nvert dataframe of all triangle interior angles
+     the associated centroid locations, and the radius-edge ratio & radius ratio,
+     + `angles` is a 3 x nvert dataframe of all triangle interior angles
+     
+ + `data/ufo.csv` subset of data sourced from the [UFO Sightings Map](https://www.arcgis.com/apps/webappviewer/index.html?id=ddda71d5211f47e782b12f3f8d06246e) collated [here](https://data.world/timothyrenner/ufo-sightings#). Data for 2020 only and excludes sightings in Alaska and Hawaiʻi.
