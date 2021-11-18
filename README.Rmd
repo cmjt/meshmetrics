@@ -1,0 +1,69 @@
+---
+title: ""
+output: md_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Investigating mesh attributes in fitting LGCPs using the INLA-SPDE approach.
+
+```{r triang_properties, eval = TRUE, echo = FALSE, fig.cap="Illustration of the different triangle attributes refered to below"}
+points <- data.frame(x = c(1, 2, 3),
+                     y = c(1,1, 2.5))
+library(deldir)
+del <- deldir(points)
+source("functions.r")
+O <- circum_O(c(1, 1), c(2, 1), c(3, 2.5))
+R <- circum_R(c(1, 1), c(2, 1), c(3, 2.5))
+
+iO <- incircle_O(c(1, 1), c(2, 1), c(3, 2.5))
+r <- incircle_r(c(1, 1), c(2, 1), c(3, 2.5))
+## stuff for point on AC line
+b <- iO[2] + (4/3)*iO[1]
+x <- (b - 1/4) * 12/25
+y <- (3/4)*x + 1/4
+
+## plot
+par(xpd = TRUE)
+plot(del, wlines = "triang", asp = 1, ylim = c(1,4), xlim = c(0,3),
+     pch = 20, lwd = 2)
+points(O[1], O[2], pch = 4, lwd = 3)
+## circumcircle
+plotrix::draw.circle(O[1], O[2], R)
+arrows(O[1], O[2], points[1,1], points[1, 2], length = 0, lty = 2)
+arrows(O[1], O[2], points[2,1], points[2, 2], length = 0, lty = 2)
+arrows(O[1], O[2], points[3,1], points[3, 2], length = 0, lty = 2)
+## text
+text(points - c(1,1,-1)*0.1,
+     labels = c(expression(italic("x")),expression(italic("y")),expression(italic("z"))))
+text(O[1],O[2] + 0.15, labels = expression( italic("C")))
+text(1.1, 1.75,  labels = expression( italic("R")))
+text(1.5, 1.1,  labels = expression("\u2113"[min]))
+text(2.6, 2.1, expression(theta))
+plotrix::draw.arc(3, 2.5, 0.5, deg1 = 217, deg2 = 236)
+## incircle
+points(iO[1], iO[2], pch = 20, col = "grey")
+plotrix::draw.circle(iO[1], iO[2], r, border = "grey")
+arrows(iO[1], iO[2], points[1,1], points[1, 2], length = 0, lty = 2, col = "grey")
+arrows(iO[1], iO[2], points[2,1], points[2, 2], length = 0, lty = 2, col = "grey")
+arrows(iO[1], iO[2], points[3,1], points[3, 2], length = 0, lty = 2, col = "grey")
+arrows(iO[1], iO[2], x, y, length = 0, col = "grey")
+text(1.7, 1.35,  labels = expression( italic("r")), col = "grey")
+text(iO[1],iO[2] - 0.1, labels = expression( italic("c")), col = "grey")
+```
+
+
+
+## Overview
+
+## Files
+
+ + `functions.r` contains a number of function to calculate different metrics measures and attributes. The main function
+ `get_triag_attributes()` takes a `inla.mesh.2d()` object and returns a named list of length three: 
+     
+     + `edges` a dataframe of mesh segments  
+     + `triangles` a dataframe with, for each triangle in the triangulation, the circumcircle and incircle radii,
+     the assocoated centroid locations, and the radius-edge ratio & radius ratio,
+     + angles` is a 3 x nvert dataframe of all triangle interior angles
