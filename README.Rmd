@@ -70,3 +70,8 @@ text(iO[1],iO[2] - 0.1, labels = expression( italic("c")), col = "grey")
      + `angles` is a 3 x nvert dataframe of all triangle interior angles
      
  + `data/ufo.csv` subset of data sourced from the [UFO Sightings Map](https://www.arcgis.com/apps/webappviewer/index.html?id=ddda71d5211f47e782b12f3f8d06246e) collated [here](https://data.world/timothyrenner/ufo-sightings#). Data for 2020 only and excludes sightings in Alaska and Hawaiʻi.
+ 
+```{r ufo}
+ufo <- readr::read_csv("data/ufo.csv")
+ufo
+```

@@ -92,11 +92,6 @@ segs <- function(mesh){
 #' @param s a dataframe of mesh triangle segments as returned by
 #' \code(segs())
 mesh_ang <- function(mesh, s){
-    ang <- function(a,b,c){
-        cosang <- (a^2 + b^2 -c^2)/(2*a*b)
-        ang <- acos(cosang)
-        return(ang*180/pi)
-    }
     tv <- mesh$graph$tv
     angs <- matrix(numeric(3*nrow(tv)), ncol = 3)
     for(i in 1:nrow(tv)){
@@ -161,4 +156,17 @@ get_triag_attributes <- function(mesh){
                      i_Ox = i_O[, 1],  i_Oy = i_O[, 2],
                      re = c_R/mn, rr = i_R/c_R)
     return(list(edges = verts, triangles = df, angles = angles))
+}
+#' Wrapper function to plot mesh as displayed in ms (using ggplot2)
+#' @param mesh an \code{inla.mesh.2d()} object
+#' @param xy xy coordinates of points
+#' @param domain spatial polygon of region/domain
+plt_mesh <- function(mesh, xy, domain){
+    points <- data.frame(x = mesh$loc[, 1], y = mesh$loc[, 2])
+    tmp <-  ggplot2::ggplot(points, ggplot2::aes(x,y)) +
+        ggforce::geom_delaunay_tile(alpha = 0.3, colour = 'black',fill = "transparent") +
+        ggplot2::theme_void() +
+        ggplot2::geom_sf(data = domain, inherit.aes = FALSE, fill = NA, color = "black", size = 1.5) +
+        ggplot2::geom_point(data = xy, ggplot2::aes(x, y), shape = 18, size = 2)
+    return(tmp)
 }
