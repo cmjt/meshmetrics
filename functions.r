@@ -123,6 +123,31 @@ lmin <- function(mesh){
     }
     return(lmin)
 }
+#' Transform a  \code{inla.mesh.2d()} into a sf
+#' @param mesh an \code{inla.mesh.2d()} object
+#' @source \url{https://groups.google.com/g/r-inla-discussion-group/c/z1n1exlZrKM}
+#' @details modified from function suggested by Finn in the
+#' R-inla discussion Google Group
+mesh_2_sf <- function(mesh) {
+    crs <- inla.CRS(inla.CRSargs(mesh$crs))
+    triags <- sp::SpatialPolygonsDataFrame(
+        Sr <- sp::SpatialPolygons(lapply(
+            1:nrow(mesh$graph$tv),
+            function(x) {
+                tv <- mesh$graph$tv[x, , drop = TRUE]
+                sp::Polygons(list(sp::Polygon(mesh$loc[tv[c(1, 3, 2, 1)],
+                                               1:2,
+                                               drop = FALSE])),
+                         ID = x)
+            }
+        ),
+        proj4string = crs
+        ),
+        data = as.data.frame(mesh$graph$tv[, c(1, 3, 2), drop = FALSE]),
+        match.ID = FALSE
+    )
+   sf::st_as_sf(triags)
+}
 #' Calculate a number of different mesh attributes
 #' @param mesh an \code{inla.mesh.2d()} object
 #' @return a list of length three: \code{edges} a
@@ -134,7 +159,6 @@ lmin <- function(mesh){
 #' the radius-edge ratio \code{re} and radius ratio \code{rr};
 #' the third element \code{angles} is a 3 x nvert dataframe of all
 #' triangle interior angles
-
 get_triag_attributes <- function(mesh){
     verts <- segs(mesh = mesh)
     angles <- mesh_ang(mesh = mesh, s = verts)
@@ -155,7 +179,10 @@ get_triag_attributes <- function(mesh){
                      c_Ox = c_O[, 1],  c_Oy = c_O[, 2],
                      i_Ox = i_O[, 1],  i_Oy = i_O[, 2],
                      re = c_R/mn, rr = i_R/c_R)
-    return(list(edges = verts, triangles = df, angles = angles))
+    sf <- mesh_2_sf(mesh)
+    return(list(edges = verts, triangles = df,
+                angles = angles,
+                sf = sf))
 }
 #' Wrapper function to plot mesh as displayed in ms (using ggplot2)
 #' @param mesh an \code{inla.mesh.2d()} object
