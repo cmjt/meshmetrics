@@ -57,7 +57,43 @@ text(iO[1],iO[2] - 0.1, labels = expression( italic("c")), col = "grey")
 ```
 
 
-**Note**: The radius-edge ratio of a plolygon $\tau$ is given by $re = \frac{R}{l_{\text{min}}}$, where R is the circumradius and $l_{\text{min}}$ is the length of the shortest edge. The radius ratio $rr = \frac{r}{R}$, where $r$ is the inradius.
+**Note**: The radius-edge ratio of a polygon $\tau$ is given by $re = \frac{R}{l_{\text{min}}}$, where R is the circumradius and $l_{\text{min}}$ is the length of the shortest edge. The radius ratio $rr = \frac{r}{R}$, where $r$ is the inradius.
+
+We can visualise each triangle measure:
+
+```{r hores__re, eval = TRUE, echo = FALSE}
+url <- "https://gist.githubusercontent.com/cmjt/9a5e43cce69a3babb129b0a448e65752/raw/8653d11cb6ace667a3f5683982ae82366a3ac5d2/horse.csv"
+horse <- read.csv(url)
+source("functions.r")
+library(sp)
+library(INLA)
+library(ggplot2)
+library(patchwork)
+sp <- sp::SpatialPolygons(list(sp::Polygons(list(sp::Polygon(horse)), '0')))
+bound <- inla.sp2segment(sp)
+
+m1 <- INLA::inla.mesh.2d(boundary = bound,
+                         max.edge = 2)
+m3 <- INLA::inla.mesh.create(horse, bound = bound)
+m1_tris <- get_triag_attributes(m1)
+m3_tris <- get_triag_attributes(m3)
+
+## mesh attribute plots
+
+rr3 <- ggplot(m3_tris$sf, aes(fill = m3_tris$triangles$rr)) +
+    geom_sf(colour = NA) + theme_void() +
+    scale_fill_continuous(name = "Radius Ratio", limits = c(0, 0.5))
+
+
+rr1 <- ggplot(m1_tris$sf, aes(fill = m1_tris$triangles$rr)) +
+    geom_sf(colour = NA) + theme_void() +
+    scale_fill_continuous(name = "Radius Ratio", limits = c(0, 0.5))
+
+(rr3 / rr1) + plot_annotation(tag_levels = 'A') + plot_layout(guides = "collect")
+
+```
+
+
 
 ## Files
 

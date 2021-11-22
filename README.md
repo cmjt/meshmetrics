@@ -6,10 +6,14 @@ approach.
 ![Illustration of the different triangle attributes refered to
 below](README_files/figure-markdown_strict/triang_properties-1.png)
 
-**Note**: The radius-edge ratio of a plolygon *τ* is given by
+**Note**: The radius-edge ratio of a polygon *τ* is given by
 $re = \\frac{R}{l\_{\\text{min}}}$, where R is the circumradius and
 *l*<sub>min</sub> is the length of the shortest edge. The radius ratio
 $rr = \\frac{r}{R}$, where *r* is the inradius.
+
+We can visualise each triangle measure:
+
+![](README_files/figure-markdown_strict/hores__re-1.png)
 
 ## Files
 
@@ -36,7 +40,7 @@ $rr = \\frac{r}{R}$, where *r* is the inradius.
     ufo <- readr::read_csv("data/ufo.csv")
     ufo
 
-    ## # A tibble: 6,184 × 13
+    ## # A tibble: 5,785 × 13
     ##    summary   city   state  date_time           shape duration stats  report_link
     ##    <chr>     <chr>  <chr>  <dttm>              <chr> <chr>    <chr>  <chr>      
     ##  1 Driving … Brady  Texas  2020-01-29 19:45:00 light Lights … Occur… http://www…
@@ -46,8 +50,8 @@ $rr = \\frac{r}{R}$, where *r* is the inradius.
     ##  5 White re… Port … Flori… 2020-01-22 10:32:00 rect… 10 seco… Occur… http://www…
     ##  6 Large Mo… Battl… Michi… 2020-01-22 19:18:00 light 2 minut… Occur… http://www…
     ##  7 Seen 3 m… Detro… Michi… 2020-01-20 15:00:00 flash 45 minu… Occur… http://www…
-    ##  8 Fireball… Masti… New Y… 2020-01-12 18:57:00 fire… 4 minut… Occur… http://www…
-    ##  9 I looked… Idaho… Idaho  2020-01-06 18:45:00 <NA>  <NA>     Occur… http://www…
-    ## 10 Bright l… Comme… Ohio   2020-01-01 20:08:00 <NA>  3 secon… Occur… http://www…
-    ## # … with 6,174 more rows, and 5 more variables: text <chr>, posted <dttm>,
+    ##  8 I looked… Idaho… Idaho  2020-01-06 18:45:00 <NA>  <NA>     Occur… http://www…
+    ##  9 Bright l… Comme… Ohio   2020-01-01 20:08:00 <NA>  3 secon… Occur… http://www…
+    ## 10 A contra… Harri… Virgi… 2020-01-06 13:45:00 unkn… 15 minu… Occur… http://www…
+    ## # … with 5,775 more rows, and 5 more variables: text <chr>, posted <dttm>,
     ## #   city_latitude <dbl>, city_longitude <dbl>, year <dbl>
