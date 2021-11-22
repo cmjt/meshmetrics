@@ -11,6 +11,7 @@ source("functions.r")
 region <-  as(sf::st_as_sf(maps::map("usa", fill = TRUE, plot = FALSE)), "Spatial")
 locs <- data.frame(x = ufo$city_longitude, y = ufo$city_latitude)
 
+
 ## mesh examples (first three obvioulsy ridiculous mesh)
 
 mesh01 <- inla.mesh.2d(boundary = inla.sp2segment(region), 
@@ -53,7 +54,7 @@ attributes <- lapply(mesh_list, get_triag_attributes) ## takes a while
 
 all_r <-  do.call(`rbind`, s <- lapply(attributes, function(x) x$triangles))
 all_r$mesh <- rep(paste("Mesh", 1:6, sep = " "), times = sapply(s, nrow))
-## data manipulation
+## data manipulation for plotting
 require(tidyverse)
 all_r <- all_r %>%
         group_by(mesh) %>%
@@ -85,3 +86,16 @@ r_e <- ggplot(all_r, aes(y = re, x = mesh)) +
 
 r_r + r_e
 
+## plotting the triangle attributes
+## Radius ratio
+plts <- lapply(attributes,
+               function(x) {
+                   ggplot(x$sf, aes(fill = x$triangles$rr) ) +
+                       geom_sf(colour = NA, size = 0.1) + theme_void() +
+                       scale_fill_continuous(name = "Radius Ratio", limits = c(0, 0.5))
+               }
+               )               
+
+
+((plts[[1]] + plts[[2]] + plts[[3]]) / (plts[[4]] + plts[[5]] + plts[[6]])) +
+    plot_annotation(tag_levels = 'A') + plot_layout(guides = "collect")
