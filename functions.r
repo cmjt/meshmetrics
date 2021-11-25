@@ -84,7 +84,7 @@ segs <- function(mesh){
                 data.frame(a = mesh$loc[mesh$graph$tv[, 1], c(1, 2)],
                            b = mesh$loc[mesh$graph$tv[, 3], c(1, 2)]))
     colnames(df) <- c("x", "y", "xend", "yend")
-    df$length <- raster::pointDistance(df[,1:2], df[,3:4], FALSE, allpairs = FALSE)
+    df$length <- c(unlist(dist(df[,1:2], df[,3:4])))
     return(df)
 }
 #' Calculate all interior mesh triangle angles
@@ -100,7 +100,7 @@ mesh_ang <- function(mesh, s){
                          y = rep(mesh$loc[tv[i,],2], each = 2))
         vs$xend <- vs$x[c(3, 5, 1, 5, 1, 3)];vs$yend <- vs$y[c(3, 5, 1, 5, 1, 3)]
         vs <- vs[c(1,2,4),]
-        dists <- unique(plyr::match_df(s, vs, on = NULL))$length
+        dists <- c(unlist(dist(vs[,1:2], vs[,3:4])))
         angs[i, 1] <- ang(dists[1], dists[2], dists[3])
         angs[i, 2] <- ang(dists[2], dists[3], dists[1])
         angs[i, 3] <- ang(dists[3], dists[1], dists[2])
