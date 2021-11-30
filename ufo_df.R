@@ -1,30 +1,31 @@
 library(spatstat)
 library(INLA)
-library(patchwork)
-
-ufo <- read.csv("data/ufo.csv")
-names(ufo)
-head(ufo)
-
-
+library(maps) ## Display of maps
+library(ggplot2)
 library(sp)
-## convert lat/long to UTM ...
-dpts <- SpatialPoints(ufo[, c("city_longitude", "city_latitude")], proj4string=CRS("+proj=longlat +datum=WGS84"))
-# spTransform(dpts, CRS("+proj=utm +zone=13 +ellps=WGS84"))
+library(patchwork)
+## read in data
+ufo <- readr::read_csv("data/ufo.csv")
+## source required functions
+source("functions.r")
+## define region and points
+region <-  as(sf::st_as_sf(maps::map("usa", fill = TRUE, plot = FALSE)), "Spatial")
+locs <- data.frame(x = ufo$city_longitude, y = ufo$city_latitude)
+
+## convert the existing lat-long coordinates to UTM (easting-northing system)
+cord.dec <- SpatialPoints(locs, proj4string = CRS("+proj=longlat"))
+cord.UTM <- spTransform(cord.dec, CRS("+init=esri:102003"))
+cord.UTM
 
 ## create an interactive map using use a basemap given by the OpenStreetmap provider
 library(tmap)
 tmap_mode("view")
 tm_basemap(leaflet::providers$OpenStreetMap) +
-  tm_shape(dpts) + tm_dots()
-
+  tm_shape(cord.dec) + tm_dots()
 
 
 ## Model without covariates
 
-library(maps) ## Display of maps
-library(ggplot2)
-library(mapproj) ## Converts latitude/longitude into projected coordinates
 states <- map_data("state")
 usa <- map_data('usa')
 
@@ -49,8 +50,6 @@ ggplot() +
 
 ### Mesh construction
 
-## source required functions
-source("functions.r")
 ## define region and points
 region <-  as(sf::st_as_sf(maps::map("usa", fill = TRUE, plot = FALSE)), "Spatial")
 locs <- data.frame(x = ufo$city_longitude, y = ufo$city_latitude)
