@@ -111,3 +111,10 @@ rr1 <- ggplot(m1_tris$sf, aes(fill = m1_tris$triangles$rr)) +
 ufo <- readr::read_csv("data/ufo.csv")
 ufo
 ```
+
+ + `data/bigfoot.csv` subset of [Bigfoot Sightings data](https://data.world/timothyrenner/bfro-sightings-data). Data span 2000--2005  and exclude sightings in Alaska and Hawaiʻi.
+ 
+ ```{r bigfoot}
+bigfoot <- readr::read_csv("data/bigfoot.csv")
+bigfoot
+```
