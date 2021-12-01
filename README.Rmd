@@ -118,3 +118,26 @@ ufo
 bigfoot <- readr::read_csv("data/bigfoot.csv")
 bigfoot
 ```
+
+```{r plots, echo = FALSE, eval = TRUE}
+library(ggplot2)
+library(patchwork)
+usa <- map_data("state")
+p1 <- ggplot(data = usa, aes(x = long, y = lat, group = group)) + 
+  geom_polygon(fill = "grey", alpha = 0.5) + 
+  theme_void() +
+  coord_fixed(1.3) +
+   geom_point(data = bigfoot, aes(y = latitude,  x = longitude), alpha = 0.1,
+               size = 1, inherit.aes = FALSE) +
+    ggtitle("Bigfoot sightings 2000–2005")
+p2 <- ggplot(data = usa, aes(x = long, y = lat, group = group)) + 
+  geom_polygon(fill = "grey", alpha = 0.5) + 
+  theme_void() +
+  coord_fixed(1.3) +
+   geom_point(data = ufo, aes(y = city_latitude,  x = city_longitude), alpha = 0.1,
+               size = 1, inherit.aes = FALSE) +
+    ggtitle("UFO sightings 2020")
+
+p2/p1
+
+```

@@ -55,3 +55,35 @@ We can visualise each triangle measure:
     ## 10 A contra… Harri… Virgi… 2020-01-06 13:45:00 unkn… 15 minu… Occur… http://www…
     ## # … with 5,775 more rows, and 5 more variables: text <chr>, posted <dttm>,
     ## #   city_latitude <dbl>, city_longitude <dbl>, year <dbl>
+
+-   `data/bigfoot.csv` subset of [Bigfoot Sightings
+    data](https://data.world/timothyrenner/bfro-sightings-data). Data
+    span 2000–2005 and exclude sightings in Alaska and Hawaiʻi.
+
+<!-- -->
+
+    bigfoot <- readr::read_csv("data/bigfoot.csv")
+    bigfoot
+
+    ## # A tibble: 972 × 29
+    ##    observed    location_details   county state season title   latitude longitude
+    ##    <chr>       <chr>              <chr>  <chr> <chr>  <chr>      <dbl>     <dbl>
+    ##  1 "For the p… This location is … Shann… Sout… Fall   Report…     43.4    -102. 
+    ##  2 "My family… East on Route 104… Wayne… New … Fall   Report…     43.3     -76.9
+    ##  3 "While thi… Ward County, Just… Ward … Nort… Spring Report…     48.3    -101. 
+    ##  4 "(Please s… <NA>               Mount… Nort… Winter Report…     47.7    -103. 
+    ##  5 "I was com… forested wetland … Warre… New … Summer Report…     40.8     -75.1
+    ##  6 "My summer… We were on the tr… Taos … New … Spring Report…     36.6    -105. 
+    ##  7 "On Aug 26… From Garrison tak… McLea… Nort… Summer Report…     47.7    -102. 
+    ##  8 "Foot prin… The location was … McKen… Nort… Winter Report…     47.6    -103. 
+    ##  9 "The follo… Georgia Ave. and … Sarpy… Nebr… Summer Report…     41.1     -95.9
+    ## 10 "We live n… (Location withhel… Dougl… Nebr… Summer Report…     41.2     -95.9
+    ## # … with 962 more rows, and 21 more variables: date <date>, number <dbl>,
+    ## #   classification <chr>, geohash <chr>, temperature_high <dbl>,
+    ## #   temperature_mid <dbl>, temperature_low <dbl>, dew_point <dbl>,
+    ## #   humidity <dbl>, cloud_cover <dbl>, moon_phase <dbl>,
+    ## #   precip_intensity <dbl>, precip_probability <dbl>, precip_type <chr>,
+    ## #   pressure <dbl>, summary <chr>, uv_index <dbl>, visibility <dbl>,
+    ## #   wind_bearing <dbl>, wind_speed <dbl>, year <dbl>
+
+![](README_files/figure-markdown_strict/plots-1.png)
