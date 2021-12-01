@@ -13,9 +13,10 @@ region <-  as(sf::st_as_sf(maps::map("usa", fill = TRUE, plot = FALSE)), "Spatia
 locs <- data.frame(x = ufo$city_longitude, y = ufo$city_latitude)
 
 ## convert the existing lat-long coordinates to UTM (easting-northing system)
-cord.dec <- SpatialPoints(locs, proj4string = CRS("+proj=longlat"))
-cord.UTM <- spTransform(cord.dec, CRS("+init=esri:102003"))
-cord.UTM
+ufo_locs <- ufo
+coordinates(ufo_locs) <- c("city_longitude", "city_latitude")
+proj4string(ufo_locs) <- CRS("+proj=longlat +datum=WGS84")
+ufo_sp <- spTransform(ufo_locs, CRS("+init=esri:102003"))
 
 ## create an interactive map using use a basemap given by the OpenStreetmap provider
 library(tmap)
@@ -24,8 +25,8 @@ tm_basemap(leaflet::providers$OpenStreetMap) +
   tm_shape(cord.dec) + tm_dots()
 
 
-## Model without covariates
-
+## Display of maps
+library(maps) 
 states <- map_data("state")
 usa <- map_data('usa')
 
@@ -47,12 +48,6 @@ ggplot() +
         plot.background=element_blank()) +
   coord_map("mercator")
 
-
-### Mesh construction
-
-## define region and points
-region <-  as(sf::st_as_sf(maps::map("usa", fill = TRUE, plot = FALSE)), "Spatial")
-locs <- data.frame(x = ufo$city_longitude, y = ufo$city_latitude)
 
 ## mesh examples (first three obvioulsy ridiculous mesh)
 
@@ -79,29 +74,15 @@ mesh05 <- inla.mesh.2d(loc = locs, boundary = inla.sp2segment(region),
 mesh06 <- inla.mesh.2d(loc = locs, boundary = inla.sp2segment(region),
                        max.edge = c(0.75,1), cutoff = 0.5)
 
-## plot mesh
-
-mesh_list <- list(mesh01, mesh02, mesh03,
-                  mesh04, mesh05, mesh06)
-
-lst <- lapply(mesh_list, plt_mesh, xy = locs, domain = sf::st_as_sf(region))
-
-((lst[[1]] + lst[[2]] + lst[[3]]) / (lst[[4]] + lst[[5]] + lst[[6]]))
-
 
 ## Use mesh05 to fit the model
 plot(mesh05, asp=1)
 
 
-## Points
-ufo_pts <- as.matrix(ufo[, c("city_longitude", "city_latitude")])
-mesh_pts <- as.matrix(mesh05$loc[, 1:2])
-allpts <- rbind(mesh_pts, ufo_pts)
-
 ## Number of vertices in the mesh05
 (nv <- mesh05$n)
-## Number of points in the data
-(n <- nrow(ufo_pts))
+## number of observations
+(n <- nrow(ufo_sp))
 
 ## Create SPDE
 ufo_spde <- inla.spde2.pcmatern(mesh = mesh05, alpha = 2,
@@ -111,16 +92,11 @@ ufo_spde <- inla.spde2.pcmatern(mesh = mesh05, alpha = 2,
 
 ## mesh weights
 source("book.mesh.dual.R")
-
 dmesh <- book.mesh.dual(mesh05)
-usa_bdy <- cbind(usa[, c("long", "lat")])
+usa_bdy <- SpatialPoints(region, proj4string = CRS("+proj=longlat +datum=WGS84"))
+usa_UTM <- spTransform(usa_bdy, CRS("+init=esri:102003"))
 domainSP <- SpatialPolygons(list(Polygons(list(Polygon(usa_bdy)), '0')))
-
-
 library(rgeos)
-
-domainSP <- gBuffer(domainSP, byid=TRUE, width=0) ## self-intersection
-
 w <- sapply(1:length(dmesh), function(i) {
   if (gIntersects(dmesh[i, ], domainSP))
     return(gArea(gIntersection(dmesh[i, ], domainSP)))
@@ -136,7 +112,7 @@ table(w > 0)
 y.pp <- rep(0:1, c(nv, n))
 e.pp <- c(w, rep(0, n))
 imat <- Diagonal(nv, rep(1, nv))
-lmat <- inla.spde.make.A(mesh05, ufo_pts)
+lmat <- inla.spde.make.A(mesh05, coordinates(ufo_sp))
 A.pp <- rbind(imat, lmat)
 
 stk.pp <- inla.stack(data = list(y = y.pp, e = e.pp),
@@ -151,7 +127,7 @@ pp.res <- inla(y ~ 0 + b0 + f(i, model = ufo_spde),
                control.predictor = list(A = inla.stack.A(stk.pp)),
                control.compute = list(dic = TRUE, cpo = TRUE, waic = TRUE),
                E = inla.stack.data(stk.pp)$e)
-
+summary(pp.res)
 pp.res$summary.fixed
 pp.res$summary.hyperpar
 
