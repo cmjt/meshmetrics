@@ -2,6 +2,91 @@
 #' a wrapper function for inla.mesh.2d
 #' @param mesh_mat a matrix that contains all the conditions for the mesh construction.
 
+mesh_sim <- function(mesh_mat){
+  mesh_list <- list()
+  for (x in 1:nrow(mesh_mat)){
+    param <- mesh_mat[x, ]
+    if (!sum(param == 0) > 0) {
+      mesh_list_1 <- inla.mesh.2d(loc=get(param[1]), boundary = inla.sp2segment(get(param[2])),
+                                  max.edge = c(param[3], param[4]), cutoff = param[5])
+      mesh_list <- append(mesh_list, list(mesh_list_1))
+    } 
+    else if (sum(param == 0) > 0) {
+      
+      loc <- param[1]
+      boundary <- param[2]
+      inner <- param[3]
+      outer <- param[4]
+      cutoff <- param[5]
+      
+      if (sum(param == 0) == 1) {
+        if (loc == 0) {
+          mesh_list_2 <- inla.mesh.2d(boundary = inla.sp2segment(get(boundary)),
+                                      max.edge = c(inner, outer), cutoff = cutoff)
+          mesh_list <- append(mesh_list, list(mesh_list_2))
+        }
+        if (boundary == 0) {
+          mesh_list_3 <- inla.mesh.2d(loc = get(loc), max.edge = c(inner, outer), cutoff = cutoff)
+          mesh_list <- append(mesh_list, list(mesh_list_3))
+        }
+        if (outer == 0) { 
+          outer <- NULL
+          mesh_list_4 <- inla.mesh.2d(loc=get(loc), boundary = inla.sp2segment(get(boundary)),
+                                      max.edge = c(inner, outer), cutoff = cutoff)
+          mesh_list <- append(mesh_list, list(mesh_list_4))
+        }
+        if (cutoff == 0) {
+          cutoff <- NULL
+          mesh_list_5 <- inla.mesh.2d(loc=get(loc), boundary = inla.sp2segment(get(boundary)),
+                                      max.edge = c(inner, outer), cutoff = cutoff)
+          mesh_list <- append(mesh_list, list(mesh_list_5))
+        }
+      }
+      
+      if (sum(param == 0) == 2) {
+        if (loc == 0) {
+          if (outer == 0) { 
+            outer <- NULL
+          }
+          if (cutoff == 0) {
+            cutoff <- NULL
+          }
+          mesh_list_6 <- inla.mesh.2d(boundary = inla.sp2segment(get(boundary)),
+                                      max.edge = c(inner, outer), cutoff = cutoff)
+          mesh_list <- append(mesh_list, list(mesh_list_6))
+        }
+        else if (boundary == 0){
+          if (outer == 0) { 
+            outer <- NULL
+          }
+          if (cutoff == 0) {
+            cutoff <- NULL
+          }
+          mesh_list_7 <- inla.mesh.2d(loc = get(loc),
+                                      max.edge = c(inner, outer), cutoff = cutoff)
+          mesh_list <- append(mesh_list, list(mesh_list_7))
+        }
+        else {
+          outer <- NULL
+          cutoff <- NULL
+          mesh_list_8 <- inla.mesh.2d(loc=get(loc), boundary = inla.sp2segment(get(boundary)),
+                                      max.edge = c(inner, outer), cutoff = cutoff)
+          mesh_list <- append(mesh_list, list(mesh_list_8))
+        }
+      }
+      
+      if (sum(param == 0) > 2) {
+        outer <- NULL
+        mesh_list_9 <- inla.mesh.2d(boundary = inla.sp2segment(get(boundary)),
+                                    max.edge = c(inner, outer))
+        mesh_list <- append(mesh_list, list(mesh_list_9))
+      }
+    } else {
+      stop("Reached the limit of function!")
+    }
+  }
+  return(mesh_list)
+}
 
 # mesh_val <- c(loc, boundary, max.edge, cutoff)
 mesh_val <- c(0, "region", c(7.5,15), 0,
@@ -9,53 +94,21 @@ mesh_val <- c(0, "region", c(7.5,15), 0,
               0, "region", c(7.5,15), 10,
               "locs", "region", c(1.5,2), 3,
               "locs", "region", c(0.75,2), 0.5,
-              "locs", "region", c(0.75,1), 0.5)
+              "locs", "region", c(0.75,1), 0.5,
+              "locs", "region", 0.75, 0, 0.5,
+              "locs", "region", 0.75, 0, 0,
+              0, "region", 7.5, 0, 10,
+              "locs", 0, c(7.5,15), 0,
+              0, "sp", 0.3, 0, 0,
+              0, "sp", 3, 0, 0)
+
 mesh_mat <- matrix(mesh_val, ncol=5, byrow = TRUE)
 
-mesh_sim <- function(mesh_mat){
-  
-  mesh_list_1 <- mesh_list_2 <- mesh_list_3 <- mesh_list_4 <- list()
-  idx <- which(mesh_mat == 0, arr.ind = TRUE)
-  i <- idx[, 1]
-  j <- idx[, 2]
-  mesh_mat_01 <- mesh_mat[unique(i),]
-  mesh_mat_02 <- mesh_mat[-unique(i),]
-  
-  if (any(mesh_mat_01 == 0)) {
-    
-    mesh_mat <- mesh_mat_01
-    
-    for (x in 1:nrow(mesh_mat)) {
-      
-      param <- mesh_mat[x, ]
-      
-      if (all(which(param == 0) %in% c(1,5))) {
-        mesh_list_1[[x]] <- inla.mesh.2d(boundary = inla.sp2segment(get(param[2])),
-                                         max.edge = c(param[3], param[4]))
-      }
-      
-      if (all(which(param == 0) %in% c(1))) {
-        mesh_list_2[[x]] <- inla.mesh.2d(boundary = inla.sp2segment(get(param[2])),
-                                         max.edge = c(param[3], param[4]), cutoff = param[5])
-      }
-      
-      if (all(which(param == 0) %in% c(5))) {
-        mesh_list_3[[x]] <- inla.mesh.2d(loc=get(param[1]), boundary = inla.sp2segment(get(param[2])),
-                                         max.edge = c(param[3], param[4]))
-      }
-    }
-  }
-  
-  if (any(mesh_mat_02 != 0)) {
-    
-    mesh_mat <- mesh_mat_02
-    
-    for (x in 1: nrow(mesh_mat)){
-      mesh_list_4[[x]] <- inla.mesh.2d(loc=get(param[1]), boundary = inla.sp2segment(get(param[2])),
-                                       max.edge = c(param[3], param[4]), cutoff = param[5])
-    }
-  }
-  return(c(mesh_list_1, mesh_list_2, mesh_list_3, mesh_list_4))
-}  
-
 mesh_n <- mesh_sim(mesh_mat)
+
+
+
+
+
+
+
