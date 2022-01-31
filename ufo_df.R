@@ -25,7 +25,7 @@ ufo_locs <- ufo
 coordinates(ufo_locs) <- c("city_longitude", "city_latitude")
 # Setting default projection
 proj4string(ufo_locs) <- CRS('+init=epsg:4326')
-ufo_sp <- spTransform(ufo_locs, CRS("+init=epsg:5070"))
+ufo_sp <- spTransform(ufo_locs, CRS("+init=epsg:2163"))
 
 
 # US region / domain
@@ -34,7 +34,7 @@ usa_bdy <- usa_region
 coordinates(usa_bdy) <- c("Longitude", "Latitude")
 # Setting default projection
 proj4string(usa_bdy) <- CRS('+init=epsg:4326')
-usa_utm <- spTransform(usa_bdy, CRS('+init=epsg:5070'))
+usa_utm <- spTransform(usa_bdy, CRS("+init=epsg:2163"))
 
 
 mesh05 <- inla.mesh.2d(loc = coordinates(ufo_sp), max.edge = c(150000, 500000), cutoff = 5000)
@@ -53,29 +53,20 @@ ufo_spde <- inla.spde2.pcmatern(mesh = mesh05,
                                 prior.sigma = c(0.01, 0.01)) # P(sigma > 0.01) = 0.01
 
 
-library("deldir")
-library("SDraw")
-library("rgeos")
-mytiles <- voronoi.polygons(SpatialPoints(mesh05$loc[, 1:2]))
+source("book.mesh.dual.R")
+dmesh <- book.mesh.dual(mesh05)
 usabdy.sp <- SpatialPolygons(list(Polygons(list(Polygon(usa_utm)), ID = "1")))
+library(rgeos)
 usabdy.sp <- gBuffer(usabdy.sp, byid=TRUE, width=0)
-## Compute weights
-w <- sapply(1:length(mytiles), function(p) {
-  aux <- mytiles[p, ]  
-  if(gIntersects(aux, usabdy.sp) ) {
-    return(gArea(gIntersection(aux, usabdy.sp)))
-  } else {
-    return(0)
-  }
+w <- sapply(1:length(dmesh), function(i) {
+  if (gIntersects(dmesh[i, ], usabdy.sp)) 
+    return(gArea(gIntersection(dmesh[i, ], usabdy.sp)))
+  else 
+    return(0) 
 })
 
 sum(w)
-table(w>0)
-
-plot(mytiles, border ="gray")
-points(mesh05$loc[, 1:2], pch = 19, cex = 0.25)
-lines(coordinates(usa_utm), col = "green", lwd = 2)
-
+table(w > 0)
 
 
 ## projection matrix
@@ -112,21 +103,34 @@ pp.res$summary.hyperpar
 
 ## Adding a covariate, population
 
-library(raster)
-library(rgdal)
-GDALinfo("pden2010_block/pden2010_60m.tif")
-pop_ras <- raster("pden2010_block/pden2010_60m.tif")
-pop_ras
-library(inlmisc)
-spdf_1 <- Grid2Polygons(pop_ras)
-spdf_2 <- as(pop_ras,'SpatialPolygonsDataFrame')
+library(sf)
+library(dplyr)
+US20 <- st_read("data/cb_2020_us_county_20m/cb_2020_us_county_20m.shp")
+# leave out AK, HI, and PR (state FIPS: 02, 15, and 72)
+conti_US20 <- US20[!(US20$STATEFP %in% c("02","15","72")), ]
 
 
-library(stars)
-r <- stack("pden2010_block/pden2010_60m.tif")
-plot(r)
+### 2020 Census Demographic Data By County
+census20 <- read.csv("data/data.csv")
+contiguous <- subset(census20, census20$STATE_ABBR != "AK" & census20$STATE_ABBR != "HI" & census20$STATE_ABBR != "PR")
+pop20 <- contiguous[, 1:3]
+
+### append total population to US20
+conti_US20 <- arrange(conti_US20, NAMELSAD)
+pop20 <- arrange(pop20, COUNTY)
+conti_US20$TOT_POP <- pop20$TOTAL_POPULATION
 
 
+
+### create shape object with state polygons
+us_pop20 <- conti_US20
+# us_pop20 <- unionSpatialPolygons(as(us_pop20, "Spatial"), IDs = us_pop20$STATEFP)
+us_pop20 <- as(us_pop20, "Spatial")
+us_pop20 <- spTransform(us_pop20, CRS("+init=epsg:2163"))
+pop_mesh <- sp::over(SpatialPoints(mesh05$loc[,1:2], 
+                                   proj4string = CRS(proj4string(ufo_sp))), us_pop20)$TOT_POP
+pop_obs <- sp::over(ufo_sp, us_pop20)$TOT_POP
+covs <- data.frame(pop = c(pop_mesh, pop_obs))
 
 ## data stack
 stk.cov <- inla.stack(
@@ -136,27 +140,13 @@ stk.cov <- inla.stack(
   tag = 'pp')
 
 ## fit model with a covariate
-pp.cov <- inla(y ~ 0 + b0 + pop + f(i, model = spde), 
+pp.cov <- inla(y ~ 0 + b0 + pop + f(i, model = ufo_spde), 
                family = 'poisson', data = inla.stack.data(stk.cov), 
                control.predictor = list(A = inla.stack.A(stk.cov)), 
                E = inla.stack.data(stk.pp)$e)
 
 ## coefficients of the fixed effects
 pp.cov$summary.fixed
-
-idx <- inla.stack.index(stk.pp, 'pred')$data
-## Model with no covariates
-spdf$SPDE0 <- pp.res$summary.fitted.values[idx, "mean"]
-## Model with covariates
-spdf$SPDE <- pp.cov$summary.fitted.values[idx, "mean"]
-
-spplot(spdf, c("SPDE0", "SPDE"), 
-       names.attr = c("No covariates", "With covariates"),
-       col.regions = viridis::plasma(16))
-
-
-
-
-
+pp.cov$summary.hyperpar
 
 
