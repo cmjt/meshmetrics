@@ -102,16 +102,17 @@ pp.res$summary.hyperpar
 
 
 ## Adding a covariate, population
-
 library(sf)
 library(dplyr)
+### US 2020 Cartographic Boundary Files
+### downloaded from https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_county_20m.zip
 US20 <- st_read("data/cb_2020_us_county_20m/cb_2020_us_county_20m.shp")
 # leave out AK, HI, and PR (state FIPS: 02, 15, and 72)
 conti_US20 <- US20[!(US20$STATEFP %in% c("02","15","72")), ]
 
 
-### 2020 Census Demographic Data By County
-census20 <- read.csv("data/data.csv")
+### 2020 Census Demographic Data By County, downloaded from https://www.dataemporium.com/dataset/254/
+census20 <- read.csv("data/US_2020_census.csv")
 contiguous <- subset(census20, census20$STATE_ABBR != "AK" & census20$STATE_ABBR != "HI" & census20$STATE_ABBR != "PR")
 pop20 <- contiguous[, 1:3]
 
