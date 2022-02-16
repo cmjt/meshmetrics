@@ -65,7 +65,7 @@ for (i in 1:nrow(mesh_mat)) {
   # number of vertices in the mesh
   nv[i] <- mesh_n[[i]]$n
   # create the dual mesh polygons
-  source("book.mesh.dual.R")
+  source("functions.r")
   dual_mesh[[i]] <- book.mesh.dual(mesh_n[[i]])
   # convert domain polygon into a Spatial Polygons
   usabdy_sp <- SpatialPolygons(list(Polygons(list(Polygon(usa_utm)), ID = "1")))

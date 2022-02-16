@@ -88,23 +88,6 @@ mesh_sim <- function(mesh_mat){
   return(mesh_list)
 }
 
-# mesh_val <- c(loc, boundary, max.edge, cutoff)
-mesh_val <- c(0, "region", c(7.5,15), 0,
-              "locs", "region", c(7.5,15), 0,
-              0, "region", c(7.5,15), 10,
-              "locs", "region", c(1.5,2), 3,
-              "locs", "region", c(0.75,2), 0.5,
-              "locs", "region", c(0.75,1), 0.5,
-              "locs", "region", 0.75, 0, 0.5,
-              "locs", "region", 0.75, 0, 0,
-              0, "region", 7.5, 0, 10,
-              "locs", 0, c(7.5,15), 0,
-              0, "sp", 0.3, 0, 0,
-              0, "sp", 3, 0, 0)
-
-mesh_mat <- matrix(mesh_val, ncol=5, byrow = TRUE)
-
-mesh_n <- mesh_sim(mesh_mat)
 
 
 
