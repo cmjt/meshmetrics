@@ -20,32 +20,30 @@ locs <- data.frame(x = ufo$city_longitude, y = ufo$city_latitude)
 
 ## convert the existing lat-long coordinates to UTM (easting-northing system)
 ufo_locs <- ufo
-# Conversion into SpatialPoints
 coordinates(ufo_locs) <- c("city_longitude", "city_latitude")
 # Setting default projection
 proj4string(ufo_locs) <- CRS('+init=epsg:4326')
-ufo_sp <- spTransform(ufo_locs, CRS("+init=epsg:2163"))
-
-
+# ufo_sp <- spTransform(ufo_locs, CRS("+init=epsg:2163"))
+## using North America Lambert Conformal Conic
+ufo_sp <- spTransform(ufo_locs,
+                      CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs "))
 # US region / domain
-# Conversion into SpatialPoints
-usa_bdy <- usa_region
-coordinates(usa_bdy) <- c("Longitude", "Latitude")
-# Setting default projection
-proj4string(usa_bdy) <- CRS('+init=epsg:4326')
-usa_utm <- spTransform(usa_bdy, CRS("+init=epsg:2163"))
+# usa_utm <- spTransform(region, CRS("+init=epsg:2163"))
+usa_utm <- spTransform(region, 
+                       CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"))
 
 
 ### --------------------------------------------------------------------------->> Mesh Construction 
 ### We compare six results for the ufo dataset based on the six different meshes
 ### mesh_val <- c(loc, boundary, max.edge, cutoff)
 source("mesh_sim.R")
-mesh_val <- c(0, "region", c(7.5,15), 0,
-              "locs", "region", c(7.5,15), 0,
-              0, "region", c(7.5,15), 10,
-              "locs", "region", c(1.5,2), 3,
-              "locs", "region", c(0.75,2), 0.5,
-              "locs", "region", c(0.75,1), 0.5)
+ufo_coo <- coordinates(ufo_sp)
+mesh_val <- c(0, "usa_utm", c(750000, 1500000), 0,
+              "ufo_coo", "usa_utm", c(750000, 1500000), 0,
+              0, "usa_utm", c(750000, 1500000), 1000000,
+              "ufo_coo", "usa_utm", c(150000,200000), 300000,
+              "ufo_coo", "usa_utm", c(75000,200000), 50000,
+              "ufo_coo", "usa_utm", c(75000,100000), 50000)
 mesh_mat <- matrix(mesh_val, ncol=5, byrow = TRUE)
 mesh_n <- mesh_sim(mesh_mat)
 
@@ -131,10 +129,75 @@ for (k in 1:nrow(mesh_mat)){
 }
 
 
+### --------------------------------------------------------------------------->> Final output CSV file
+
+list_fixed <- temp
+marg_fixed <- temp
+marg_kappa <- temp
+marg_variance <- temp
+marg_range <- temp
+list_dic <- temp
+list_waic <- temp
+
+
+for (f in 1:nrow(mesh_mat)){
+  list_fixed[[f]] <- pp.res[[f]]$summary.fixed
+  marg_fixed[[f]] <- pp.res[[f]]$marginals.fixed[[1]]
+  marg_kappa[[f]] <- pp.res.est[[f]]$marginals.kappa[[1]]
+  marg_variance[[f]] <- pp.res.est[[f]]$marginals.variance.nominal[[1]]
+  marg_range[[f]] <- pp.res.est[[f]]$marginals.range.nominal[[1]]
+  list_dic[[f]] <- pp.res[[f]]$dic$dic
+  list_waic[[f]] <- pp.res[[f]]$waic$waic
+}
+
+### --------------------------------------------------------------------------->> CSV summary.fixed
+fixed <- data.frame(matrix(unlist(list_fixed), ncol = 7, byrow = TRUE))
+colnames(fixed) <- names(pp.res[[1]]$summary.fixed)
+fixed$Mesh <- paste("Mesh", 1:nrow(mesh_mat), sep = "_")
+write.csv(fixed, file = "summary_fixed.csv")
+
+
+### --------------------------------------------------------------------------->> CSV marginals.fixed
+margfixed <- data.frame(do.call('rbind', marg_fixed))
+margfixed$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res[[1]]$marginals.fixed[[1]]))
+write.csv(margfixed, file = "marginals_fixed.csv")
+
+
+### --------------------------------------------------------------------------->> CSV marginals.log.kappa
+margkappa <- data.frame(do.call('rbind', marg_kappa))
+margkappa$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.kappa[[1]]))
+write.csv(margkappa, file = "marginals_kappa.csv")
+
+
+### --------------------------------------------------------------------------->> CSV marginals.log.variance.nominal
+margvar <- data.frame(do.call('rbind', marg_variance))
+margvar$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.variance.nominal[[1]]))
+write.csv(margvar, file = "marginals_variance.csv")
+
+
+### --------------------------------------------------------------------------->> CSV marginals.log.range.nominal
+margrange <- data.frame(do.call('rbind', marg_range))
+margrange$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.range.nominal[[1]]))
+write.csv(margrange, file = "marginals_range.csv")
+
+
+### --------------------------------------------------------------------------->> CSV DIC
+dic <- data.frame(matrix(unlist(list_dic), ncol = 1, byrow = TRUE))
+colnames(dic) <- "DIC"
+dic$Mesh <- paste("Mesh", 1:nrow(mesh_mat), sep = "_")
+write.csv(dic, file = "DIC.csv")
+
+
+### --------------------------------------------------------------------------->> CSV WAIC
+waic <- data.frame(matrix(unlist(list_waic), ncol = 1, byrow = TRUE))
+colnames(waic) <- "WAIC"
+waic$Mesh <- paste("Mesh", 1:nrow(mesh_mat), sep = "_")
+write.csv(waic, file = "WAIC.csv")
+
+
+
 
 ### --------------------------------------------------------------------------->> Adding a covariate
-
-library(sf)
 library(dplyr)
 ### US 2020 Cartographic Boundary Files
 ### downloaded from https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_county_20m.zip
@@ -151,14 +214,15 @@ pop20 <- arrange(pop20, COUNTY)
 conti_US20$TOT_POP <- pop20$TOTAL_POPULATION
 ### create shape object with state polygons
 us_pop20 <- conti_US20
-# us_pop20 <- unionSpatialPolygons(as(us_pop20, "Spatial"), IDs = us_pop20$STATEFP)
 us_pop20 <- as(us_pop20, "Spatial")
-us_pop20 <- spTransform(us_pop20, CRS("+init=epsg:2163"))
+us_pop20 <- spTransform(us_pop20,
+                        CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs "))
 
 
-
+### model with population as covariate
 
 pop_mesh <- temp
+covs <- temp
 pp.cov <- temp
 pp.cov.est <- temp
 
@@ -182,31 +246,6 @@ for (l in 1: nrow(mesh_mat)){
   pp.cov.est[[l]] <- inla.spde.result(inla = pp.cov, name = "i", spde = ufo_spde, do.transf = TRUE)
   
 }
-
-
-
-
-### --------------------------------------------------------------------------->> Final output CSV file
-
-list_fixed <- tmp
-marg_fixed <- tmp
-marg_kappa <- tmp
-marg_variance <- tmp
-marg_range <- tmp
-list_dic <- tmp
-list_waic <- tmp
-
-for (f in 1:nrow(mesh_mat)){
-  list_fixed[[f]] <- pp.res[[f]]$summary.fixed
-  marg_fixed[[f]] <- pp.res[[f]]$marginals.fixed[[1]]
-  marg_kappa[[f]] <- pp.res.est[[f]]$marginals.kappa[[1]]
-  marg_variance[[f]] <- pp.res.est[[f]]$marginals.variance.nominal[[1]]
-  marg_range[[f]] <- pp.res.est[[f]]$marginals.range.nominal[[1]]
-  list_dic[[f]] <- pp.res[[f]]$dic$dic
-  list_waic[[f]] <- pp.res[[f]]$waic$waic
-}
-
-
 
 
 
