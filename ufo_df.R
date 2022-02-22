@@ -98,6 +98,16 @@ pp.res$summary.fixed
 pp.res$summary.hyperpar
 
 
+## Projection on a grid
+gproj <- inla.mesh.projector(mesh05, xlim = 0:1, ylim = 0:1, dims = c(100, 100))
+g.mean <- inla.mesh.project(gproj, pp.res$summary.random$i$mean)
+g.sd <- inla.mesh.project(gproj, pp.res$summary.random$i$sd)
+
+library(lattice)
+library(gridExtra)
+trellis.par.set(regions=list(col=terrain.colors(16)))
+grid.arrange(levelplot(g.mean, scales=list(draw=F), xlab='', ylab='', main='mean'),
+             levelplot(g.sd, scal=list(draw=F), xla='', yla='', main='sd'), nrow=1)
 
 
 
