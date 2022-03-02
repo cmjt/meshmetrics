@@ -1,4 +1,4 @@
-ppp_sim <- function(nsim, beta0, sigma2x, prac_range, win, seed = 1234, plot = TRUE) {
+ppp_sim <- function(nsim, beta0, sigma2x, prac_range, win) {
   argg <- c(as.list(environment()), list())
   xy <- points <- rf <- dat <- lam_attr <- plts <- list()
   for(i in 1:length(beta0)){
@@ -7,7 +7,7 @@ ppp_sim <- function(nsim, beta0, sigma2x, prac_range, win, seed = 1234, plot = T
       xy[[i]][[j]] <- points[[i]][[j]] <- rf[[i]][[j]] <- dat[[i]][[j]] <- lam_attr[[i]][[j]] <- plts[[i]][[j]] <-  list()
       for(k in 1:length(prac_range)){
         xy[[i]][[j]][[k]] <- rLGCP('matern', nsim = nsim, mu = beta0[i], var = sigma2x[j],
-                                   scale = prac_range[k] / sqrt(8), nu = 1, win = as.owin(domainSP))
+                                   scale = prac_range[k] / sqrt(8), nu = 1, win = as.owin(win))
         points[[i]][[j]][[k]] <- data.frame(x = xy[[i]][[j]][[k]]$x, y = xy[[i]][[j]][[k]]$y)
         lam_attr[[i]][[j]][[k]] <- summary(as.vector(log(attr(xy[[i]][[j]][[k]], 'Lambda')$v)))
         rf[[i]][[j]][[k]] <- apply(log(attr(xy[[i]][[j]][[k]], 'Lambda')$v), 2, t) ## field flips
@@ -40,12 +40,9 @@ require(maptools)
 library(spatstat)
 library(ggplot2)
 library(patchwork)
-
-# source("ppp_sim.R")
 ## ---- data_and_domain
 domain <- data.frame(x = c(0, 2, 2, 0, 0),y = c(0, 0, 2, 2, 0))
 domainSP <- sp::SpatialPolygons(list(sp::Polygons(list(sp::Polygon(domain)), '0')))
-set.seed(1293)
 npix <- 300
 spatstat.options(npixel = npix)
 beta0 <- c(5, 2)
@@ -55,15 +52,7 @@ sim <- ppp_sim(1, beta0, sigma2x, prac_range, domainSP)
 (print(sim[["plot"]][[1]][[1]][[1]]) + print(sim[["plot"]][[1]][[1]][[2]]))/
   (print(sim[["plot"]][[1]][[2]][[1]]) + print(sim[["plot"]][[1]][[2]][[2]]))/
   (print(sim[["plot"]][[2]][[1]][[1]]) + print(sim[["plot"]][[2]][[1]][[2]]))/
-  (print(sim[["plot"]][[2]][[2]][[1]]) + print(sim[["plot"]][[2]][[2]][[2]])) 
-
-
-
-
-
-
-
-
+  (print(sim[["plot"]][[2]][[2]][[1]]) + print(sim[["plot"]][[2]][[2]][[2]]))
 
 
 
