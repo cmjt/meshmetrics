@@ -1,0 +1,249 @@
+---
+title: "ufo example"
+author: "Haiyi Shi"
+date: ""
+output: md_document
+---
+
+## Modelling UFO locations as a log-Gaussian Cox process
+
+#### Packages
+
+```{r}
+library(INLA)
+library(maps)
+library(sf)
+library(sp)
+library(ggplot2)
+library(patchwork)
+source("functions.r") ## source required functions
+```
+
+
+#### The Data and US map
+
+```{r}
+## read in data
+ufo <- readr::read_csv("data/ufo.csv")
+## us map
+states <- map_data("state")
+usa <- map_data('usa')
+usa_region <- data.frame(Longitude = usa$long, Latitude = usa$lat)
+```
+
+
+Then, convert the existing lat-long coordinates to UTM (easting-northing system), using North America Lambert Conformal Conic.
+
+```{r}
+## define region and points
+region <- as(sf::st_as_sf(maps::map("usa", fill = TRUE, plot = FALSE)), "Spatial")
+locs <- data.frame(x = ufo$city_longitude, y = ufo$city_latitude)
+ufo_locs <- ufo
+coordinates(ufo_locs) <- c("city_longitude", "city_latitude")
+proj4string(ufo_locs) <- CRS('+init=epsg:4326') ## Setting default projection
+ufo_sp <- spTransform(ufo_locs,
+                      CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs "))
+# US region / domain
+usa_utm <- spTransform(region, 
+                       CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"))
+```
+
+
+#### Mesh construction and weights
+
+An example of mesh used for model UFO locations. The location of UFO are used as initial triangulation nodes and use US shape to build a boundary for the points.
+
+```{r mesh, results='asis', fig.width=8, fig.height=8, warning=FALSE, message=FALSE, fig.cap="Mesh constructed using US map."}
+ufo_coo <- coordinates(ufo_sp)
+mesh <- inla.mesh.2d(loc = ufo_coo, boundary = inla.sp2segment(usa_utm), max.edge = c(75000,200000), cutoff = 50000)
+plot(mesh, asp=1)
+nv <- mesh$n ## number of vertices in the mesh
+n <- nrow(ufo) ## number of observations
+```
+
+
+```{r}
+## define the SPDE model
+ufo_spde <- inla.spde2.pcmatern(mesh = mesh, 
+                                alpha = 2,
+                                prior.range = c(0.1, 0.01), # P(range < 0.1) = 0.01
+                                prior.sigma = c(0.01, 0.01)) # P(sigma > 0.01) = 0.01
+dmesh <- book.mesh.dual(mesh)
+usabdy.sp <- SpatialPolygons(list(Polygons(list(Polygon(usa_utm)), ID = "1")))
+library(rgeos)
+usabdy.sp <- gBuffer(usabdy.sp, byid=TRUE, width=0)
+w <- sapply(1:length(dmesh), function(i) {
+  if (gIntersects(dmesh[i, ], usabdy.sp)) 
+    return(gArea(gIntersection(dmesh[i, ], usabdy.sp)))
+  else 
+    return(0) 
+})
+sum(w)
+table(w > 0)
+```
+
+
+
+#### Projector matrix and data stack
+
+```{r}
+y.pp <- rep(0:1, c(nv, n))
+e.pp <- c(w, rep(0, n))
+imat <- Diagonal(nv, rep(1, nv))
+lmat <- inla.spde.make.A(mesh, coordinates(ufo_sp))
+A.pp <- rbind(imat, lmat)
+## the data stack
+stk.pp <- inla.stack(
+  data = list(y = y.pp, e = e.pp),
+  A = list(1, A.pp),
+  effects = list(list(b0 = rep(1, nv + n)), list(i = 1:nv)),
+  tag = 'pp')
+```
+
+
+#### Fitting the model with no covariate and some results
+
+```{r}
+pp.res <- inla(y ~ 0 + b0 + f(i, model = ufo_spde),
+               family = 'poisson', 
+               data = inla.stack.data(stk.pp),
+               control.predictor = list(A = inla.stack.A(stk.pp)),
+               control.compute = list(dic = TRUE, cpo = TRUE, waic = TRUE),
+               E = inla.stack.data(stk.pp)$e)
+## transform to user scale
+pp.res.est <- inla.spde.result(inla = pp.res, name = "i", spde = ufo_spde, do.transf = TRUE)
+
+## some results
+summary(pp.res)
+pp.res$summary.fixed
+pp.res$summary.hyperpar
+```
+
+
+```{r res1, results='asis', warning=FALSE, message=FALSE, fig.width=8, fig.height=8}
+## marginal posterior distribution
+par(mfrow=c(2,2), mar=c(3,3,1,0.1), mgp=2:0)
+plot(pp.res$marginals.fixed[[1]], type='l', xlab=expression(beta), ylab='Density') 
+plot(pp.res.est$marginals.variance.nominal[[1]], type='l', xlab=expression(sigma[x]), ylab='Density')
+plot(pp.res.est$marginals.kappa[[1]], type='l', xlab=expression(kappa), ylab='Density')
+plot(pp.res.est$marginals.range.nominal[[1]], type='l', xlab='range nominal', ylab='Density')
+```
+
+*Posterior distribution for the hyperparameters for $\beta_0$, $\sigma^2$, $\kappa$ and the nominal range.*
+
+
+#### Projection on a grid
+
+First, we calculate a grid projection from the `mesh` and we project the posterior mean and the posterior standard deviation on the both grid.
+
+
+```{r rf1, results='asis', warning=FALSE, message=FALSE, fig.width=8, fig.height=8}
+library(lattice)
+library(gridExtra)
+gproj <- inla.mesh.projector(mesh, dims = c(1000, 1000))
+g_mean <- inla.mesh.project(gproj, pp.res$summary.random$i$mean)
+g_sd <- inla.mesh.project(gproj, pp.res$summary.random$i$sd)
+do.call('grid.arrange',
+        lapply(list(g_mean, g_sd),
+               levelplot, col.regions=terrain.colors(16),
+               scales=list(draw=FALSE), xlab='', ylab=''))
+```
+
+
+*The posterior mean and posterior variance for the random field without covariate.*
+
+
+## Including a covariate on the log-Cox process
+
+
+#### Adding US population as covariate
+
+* US 2020 Cartographic Boundary Files downloaded from https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_county_20m.zip
+
+* 2020 Census Demographic Data By County downloaded from https://www.dataemporium.com/dataset/254/
+
+
+```{r, warning=FALSE, message=FALSE, }
+library(sf)
+library(dplyr)
+
+## US 2020 Cartographic Boundary Files
+US20 <- st_read("data/cb_2020_us_county_20m/cb_2020_us_county_20m.shp")
+## leave out AK, HI, and PR (state FIPS: 02, 15, and 72)
+conti_US20 <- US20[!(US20$STATEFP %in% c("02","15","72")), ]
+
+## 2020 Census Demographic Data By County
+census20 <- read.csv("data/US_2020_census.csv")
+contiguous <- subset(census20, census20$STATE_ABBR != "AK" & census20$STATE_ABBR != "HI" & census20$STATE_ABBR != "PR")
+pop20 <- contiguous[, 1:3]
+
+### append total population to US20
+conti_US20 <- arrange(conti_US20, NAMELSAD)
+pop20 <- arrange(pop20, COUNTY)
+conti_US20$TOT_POP <- pop20$TOTAL_POPULATION
+
+### create shape object with state polygons
+us_pop20 <- conti_US20
+us_pop20 <- as(us_pop20, "Spatial")
+us_pop20 <- spTransform(us_pop20, 
+                        CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"))
+pop_mesh <- sp::over(SpatialPoints(mesh$loc[,1:2], proj4string = CRS(proj4string(ufo_sp))), us_pop20)$TOT_POP
+pop_obs <- sp::over(ufo_sp, us_pop20)$TOT_POP
+covs <- data.frame(pop = c(pop_mesh, pop_obs))
+## data stack
+stk.cov <- inla.stack(
+  data = list(y = y.pp, e = e.pp), 
+  A = list(1, A.pp),
+  effects = list(list(b0 = rep(1, nv + n), pop = covs$pop), list(i = 1:nv)),
+  tag = 'pp')
+```
+
+
+#### Fitting the model and some results
+
+
+```{r}
+pp.cov <- inla(y ~ 0 + b0 + pop + f(i, model = ufo_spde), 
+               family = 'poisson', data = inla.stack.data(stk.cov), 
+               control.predictor = list(A = inla.stack.A(stk.cov)), 
+               control.compute = list(dic = TRUE, cpo = TRUE, waic = TRUE),
+               E = inla.stack.data(stk.pp)$e)
+## transfer
+pp.cov.est <- inla.spde.result(inla = pp.cov, name = "i", spde = ufo_spde, do.transf = TRUE)
+## coefficients of the fixed effects
+summary(pp.cov)
+pp.cov$summary.fixed
+pp.cov$summary.hyperpar
+```
+
+
+
+```{r res2, results='asis', warning=FALSE, message=FALSE, fig.width=8, fig.height=8}
+par(mfrow=c(2,2), mar=c(3,3,1,0.1), mgp=2:0) 
+plot(pp.cov$marginals.fixed[[1]], type='l', xlab=expression(beta), ylab='Density') 
+plot(pp.cov.est$marginals.variance.nominal[[1]], type='l', xlab=expression(sigma[x]), ylab='Density')
+plot(pp.cov.est$marginals.kappa[[1]], type='l', xlab=expression(kappa), ylab='Density')
+plot(pp.cov.est$marginals.range.nominal[[1]], type='l', xlab='range nominal', ylab='Density')
+```
+
+*Posterior distribution for the hyperparameters for $\beta_0$, $\sigma^2$, $\kappa$ and the nominal range.*
+
+
+
+#### Projection on a grid
+
+
+```{r rf2, results='asis', warning=FALSE, message=FALSE, fig.width=10, fig.height=10}
+g_mean_cov <- inla.mesh.project(gproj, pp.cov$summary.random$i$mean)
+g_sd_cov <- inla.mesh.project(gproj, pp.cov$summary.random$i$sd)
+do.call('grid.arrange',
+        lapply(list(g_mean_cov, g_sd_cov),
+               levelplot, col.regions=terrain.colors(16),
+               scales=list(draw=FALSE), xlab='', ylab=''))
+```
+
+
+*The posterior mean and posterior variance for the random field with covariate.*
+
+
+
