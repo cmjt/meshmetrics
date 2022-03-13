@@ -1,3 +1,4 @@
+
 ppp_sim <- function(nsim, beta0, sigma2x, prac_range, win) {
   argg <- c(as.list(environment()), list())
   xy <- points <- rf <- dat <- lam_attr <- plts <- list()
@@ -32,15 +33,8 @@ ppp_sim <- function(nsim, beta0, sigma2x, prac_range, win) {
 }
 
 
-# ---- packages
-require(sp)
-require(rgeos)
-require(INLA)
-require(maptools)
-library(spatstat)
-library(ggplot2)
-library(patchwork)
 ## ---- data_and_domain
+
 domain <- data.frame(x = c(0, 2, 2, 0, 0),y = c(0, 0, 2, 2, 0))
 domainSP <- sp::SpatialPolygons(list(sp::Polygons(list(sp::Polygon(domain)), '0')))
 npix <- 300
@@ -49,12 +43,18 @@ beta0 <- c(5, 2)
 sigma2x <- c(5, 0.1) 
 prac_range <- c(5, 0.2)
 sim <- ppp_sim(1, beta0, sigma2x, prac_range, domainSP)
+
+
 (print(sim[["plot"]][[1]][[1]][[1]]) + print(sim[["plot"]][[1]][[1]][[2]]))/
   (print(sim[["plot"]][[1]][[2]][[1]]) + print(sim[["plot"]][[1]][[2]][[2]]))/
   (print(sim[["plot"]][[2]][[1]][[1]]) + print(sim[["plot"]][[2]][[1]][[2]]))/
   (print(sim[["plot"]][[2]][[2]][[1]]) + print(sim[["plot"]][[2]][[2]][[2]]))
 
 
+dir.create("ppp_pdf_files")
+
+ggsave(path = "ppp_pdf_files", filename = "point_patterns.pdf", width = 8, height = 12, 
+       bg = "white", colormodel = "cmyk", paper = "A4")
 
 
 
