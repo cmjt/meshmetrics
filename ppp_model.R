@@ -161,4 +161,3 @@ write.csv(waic, file = "WAIC.csv")
 
 
 
-
