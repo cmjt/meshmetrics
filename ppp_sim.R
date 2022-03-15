@@ -44,17 +44,17 @@ sigma2x <- c(5, 0.1)
 prac_range <- c(5, 0.2)
 sim <- ppp_sim(1, beta0, sigma2x, prac_range, domainSP)
 
+points_plts <- (sim[["plot"]][[1]][[1]][[1]] | sim[["plot"]][[1]][[1]][[2]])/
+  (sim[["plot"]][[1]][[2]][[1]] | sim[["plot"]][[1]][[2]][[2]])/
+  (sim[["plot"]][[2]][[1]][[1]] | sim[["plot"]][[2]][[1]][[2]])/
+  (sim[["plot"]][[2]][[2]][[1]] | sim[["plot"]][[2]][[2]][[2]])
 
-(print(sim[["plot"]][[1]][[1]][[1]]) + print(sim[["plot"]][[1]][[1]][[2]]))/
-  (print(sim[["plot"]][[1]][[2]][[1]]) + print(sim[["plot"]][[1]][[2]][[2]]))/
-  (print(sim[["plot"]][[2]][[1]][[1]]) + print(sim[["plot"]][[2]][[1]][[2]]))/
-  (print(sim[["plot"]][[2]][[2]][[1]]) + print(sim[["plot"]][[2]][[2]][[2]]))
 
+## create a new directory to save all the plots in the simulation
 
 dir.create("ppp_pdf_files")
-
-ggsave(path = "ppp_pdf_files", filename = "point_patterns.pdf", width = 8, height = 12, 
-       bg = "white", colormodel = "cmyk", paper = "A4")
+ggsave(path = "ppp_pdf_files", filename = "point_patterns.pdf", plot = points_plts, 
+       width = 8, height = 12, bg = "white", colormodel = "cmyk", paper = "A4")
 
 
 
