@@ -28,7 +28,6 @@ for (l in 1:length(points_df)){
                                      boundary = inla.mesh.segment(domain),
                                      refine = list(min.angle = 22),
                                      quality.spec = list(segm = 0.2, loc = 0.05))
-  
 }
 
 ## put all meshes into one list
@@ -154,7 +153,7 @@ for (i in seq_along(mesh_list)) {
 ## combine pdf files
 
 setwd("ppp_pdf_files/")
-pdfs <- list.files(path = "ppp_pdf_files/")
+pdfs <- list.files(pattern = "\\.pdf$")
 qpdf::pdf_combine(input = pdfs, output = "output.pdf")
 setwd("..")
 
