@@ -7,27 +7,54 @@ points_df <- lapply(
   as.data.frame
 )
 
-## Mesh 1 and Mesh 2, with 8 different point patterns
+## Mesh 1 -- Mesh 9, with 8 different point patterns, total 72 meshes.
 
 mesh_ls_1 <- list()
 mesh_ls_2 <- list()
 mesh_ls_3 <- list()
 mesh_ls_4 <- list()
+mesh_ls_5 <- list()
+mesh_ls_6 <- list()
+mesh_ls_7 <- list()
+mesh_ls_8 <- list()
+mesh_ls_9 <- list()
 
 for (l in 1:length(points_df)){
-  mesh_ls_1[[l]] <- inla.mesh.create(loc = points_df[[l]], 
-                                     boundary = inla.mesh.segment(domain))
-  mesh_ls_2[[l]] <- inla.mesh.create(loc = points_df[[l]],
-                                     boundary = inla.mesh.segment(domain),
-                                     refine = list(max.edge = 0.5))
-  mesh_ls_3[[l]] <- inla.mesh.create(loc = points_df[[l]],
-                                     boundary = inla.mesh.segment(domain),
-                                     refine = list(min.angle = 22, max.edge = 0.5),
-                                     cutoff = 0.1)
-  mesh_ls_4[[l]] <- inla.mesh.create(loc = points_df[[l]],
-                                     boundary = inla.mesh.segment(domain),
-                                     refine = list(min.angle = 22),
-                                     quality.spec = list(segm = 0.2, loc = 0.05))
+  mesh_ls_1[[l]] <- inla.mesh.create(loc = points_df[[l]], boundary = inla.mesh.segment(domain))
+  mesh_ls_2[[l]] <- inla.mesh.create(
+    loc = points_df[[l]],
+    boundary = inla.mesh.segment(domain),
+    refine = list(max.edge = 0.1)
+  )
+  mesh_ls_3[[l]] <- inla.mesh.create(
+    loc = points_df[[l]],
+    boundary = inla.mesh.segment(domain),
+    cutoff = 0.2
+  )
+  mesh_ls_4[[l]] <- inla.mesh.create(
+    loc = points_df[[l]],
+    boundary = inla.mesh.segment(domain),
+    refine = list(min.angle = 30)
+  )
+  mesh_ls_5[[l]] <- inla.mesh.create(
+    loc = points_df[[l]],
+    boundary = inla.mesh.segment(domain),
+    refine = list(min.angle = 30),
+    quality.spec = list(loc = 0.05)
+  )
+  mesh_ls_6[[l]] <- inla.mesh.create(
+    loc = points_df[[l]],
+    boundary = inla.mesh.segment(domain),
+    refine = list(min.angle = 30),
+    quality.spec = list(segm = 0.2, loc = 0.05)
+  )
+  mesh_ls_7[[l]] <- inla.mesh.2d(loc = points_df[[l]], boundary = inla.mesh.segment(domain),
+                                 offset = c(0.01, 0.3), max.edge = c(0.2, 0.5))
+  mesh_ls_8[[l]] <- inla.mesh.2d(loc = points_df[[l]], boundary = inla.mesh.segment(domain),
+                                 offset = c(0.01, 0.3), max.edge = c(0.2, 0.5), cutoff = 0.1)
+  mesh_ls_9[[l]] <- inla.mesh.2d(loc = points_df[[l]], boundary = inla.mesh.segment(domain),
+                                 offset = c(0.01, 0.3), max.edge = c(0.2, 0.3), cutoff = 0.1, min.angle = 26)
+  
 }
 
 ## put all meshes into one list
@@ -35,7 +62,12 @@ for (l in 1:length(points_df)){
 mesh_list <- list(mesh_1 = mesh_ls_1, 
                   mesh_2 = mesh_ls_2,
                   mesh_3 = mesh_ls_3,
-                  mesh_4 = mesh_ls_4)
+                  mesh_4 = mesh_ls_4,
+                  mesh_5 = mesh_ls_5,
+                  mesh_6 = mesh_ls_6,
+                  mesh_7 = mesh_ls_7,
+                  mesh_8 = mesh_ls_8,
+                  mesh_9 = mesh_ls_9)
 
 
 ## functions to visual the mesh attributes
@@ -80,10 +112,6 @@ mesh_info <- function(mesh_ls){
 
 x <- lapply(mesh_list, mesh_info)
 
-## create a file to save all the plots
-
-dir.create("ppp_pdf_files")
-
 
 p1 <- list()
 p2 <- list()
@@ -103,8 +131,7 @@ for (i in seq_along(mesh_list)) {
   par(mfrow = c(3,1), mar = c(2, 2, 2, 2))
   lapply(mesh_list[[i]], 
          function(x) {
-           plot(x, asp = 1, main=" ") 
-           points(loc, col=2, pch = 16)
+           plot(x, asp = 1, main=" ")
          }
   )
   dev.off()

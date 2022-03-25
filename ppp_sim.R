@@ -50,9 +50,10 @@ points_plts <- (sim[["plot"]][[1]][[1]][[1]] | sim[["plot"]][[1]][[1]][[2]])/
   (sim[["plot"]][[2]][[2]][[1]] | sim[["plot"]][[2]][[2]][[2]])
 
 
-## create a new directory to save all the plots in the simulation
+## create a new file to save all the plots
 
 dir.create("ppp_pdf_files")
+
 ggsave(path = "ppp_pdf_files", filename = "point_patterns.pdf", plot = points_plts, 
        width = 8, height = 12, bg = "white", colormodel = "cmyk", paper = "A4")
 
