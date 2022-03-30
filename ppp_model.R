@@ -3,6 +3,7 @@
 library(sp)
 library(rgeos)
 library(INLA)
+inla.setOption(mkl=TRUE)
 library(spatstat)
 library(ggplot2)
 library(gridExtra)
@@ -12,11 +13,10 @@ library(maptools)
 source("functions.r")
 ## generate 8 different point patterns
 source("ppp_sim.R")
-## 4 mesh were made using point locations from 8 different point patterns
+## 9 mesh were made using point locations from 8 different point patterns
 source("ppp_mesh.R")
 
-
-## ---- fitting the model, 32 models in total
+## ---- fitting the model,  models in total
 
 mesh_flatten <- unlist(mesh_list, recursive = FALSE)
 
@@ -37,15 +37,12 @@ stk.pp <- list()
 pp.res <- list()
 pp.res.est <- list()
 
+## number of simulated points 
 for (p in 1:(length(mesh_flatten)/length(mesh_list))) {
-  
-  ## number of simulated points
-  
   n[[p]] <- nrow(points_df[[p]])
 }
 
 n <- rep(unlist(n), length(mesh_list))
-
 
 for (q in 1:length(mesh_flatten)) {
   
@@ -96,13 +93,17 @@ for (q in 1:length(mesh_flatten)) {
                       data = inla.stack.data(stk.pp[[q]]),
                       control.predictor = list(A = inla.stack.A(stk.pp[[q]])),
                       control.compute = list(dic = TRUE, cpo = TRUE, waic = TRUE),
-                      E = inla.stack.data(stk.pp[[q]])$e)
+                      E = inla.stack.data(stk.pp[[q]])$e,
+                      control.inla = list(diagonal = 100, strategy = "gaussian", int.strategy = "eb"),
+                      verbose = TRUE)
   
   ## transform to user scale
   
   pp.res.est[[q]] <- inla.spde.result(inla = pp.res[[q]], name = "i", spde = spde[[q]], do.transf = TRUE)
   
 }
+
+
 
 
 ### --------------------------------------------------------------------------->> Final output CSV file
@@ -129,46 +130,64 @@ for (f in 1:length(mesh_flatten)){
 ### --------------------------------------------------------------------------->> CSV summary.fixed
 fixed <- data.frame(matrix(unlist(list_fixed), ncol = 7, byrow = TRUE))
 colnames(fixed) <- names(pp.res[[1]]$summary.fixed)
-fixed$Mesh <- paste("Mesh", 1:length(mesh_list), sep = "_")
+fixed$Pattern <- rep(paste("Pattern", 1:(length(mesh_flatten)/length(mesh_list)), sep = "_"), 
+                     times = length(mesh_list))
+fixed$Mesh <- rep(paste("Mesh_band", 1:length(mesh_list), sep = "_"), each = length(mesh_flatten)/length(mesh_list))
 write.csv(fixed, file = "summary_fixed.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.fixed
 margfixed <- data.frame(do.call('rbind', marg_fixed))
-margfixed$Mesh <- rep(paste("Mesh", 1:length(mesh_list), sep = "_"), each = nrow(pp.res[[1]]$marginals.fixed[[1]]))
+margfixed$Pattern <- rep(paste("Pattern", 1:(length(mesh_flatten)/length(mesh_list)), sep = "_"), 
+                         each = sapply(marg_fixed, nrow)[1], times = length(mesh_list))
+margfixed$Mesh <- rep(paste("Mesh_band", 1:length(mesh_list), sep = "_"), 
+                      each = sapply(marg_fixed, nrow)[1] * (length(mesh_flatten)/length(mesh_list)))
 write.csv(margfixed, file = "marginals_fixed.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.log.kappa
 margkappa <- data.frame(do.call('rbind', marg_kappa))
-margkappa$Mesh <- rep(paste("Mesh", 1:length(mesh_list), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.kappa[[1]]))
+margkappa$Pattern <- rep(paste("Pattern", 1:(length(mesh_flatten)/length(mesh_list)), sep = "_"), 
+                         each = sapply(marg_kappa, nrow)[1], times = length(mesh_list))
+margkappa$Mesh <- rep(paste("Mesh_band", 1:length(mesh_list), sep = "_"), 
+                      each = sapply(marg_kappa, nrow)[1] * (length(mesh_flatten)/length(mesh_list)))
 write.csv(margkappa, file = "marginals_kappa.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.log.variance.nominal
 margvar <- data.frame(do.call('rbind', marg_variance))
-margvar$Mesh <- rep(paste("Mesh", 1:length(mesh_list), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.variance.nominal[[1]]))
+margvar$Pattern <- rep(paste("Pattern", 1:(length(mesh_flatten)/length(mesh_list)), sep = "_"), 
+                       each = sapply(marg_variance, nrow)[1], times = length(mesh_list))
+margvar$Mesh <- rep(paste("Mesh_band", 1:length(mesh_list), sep = "_"), 
+                    each = sapply(marg_variance, nrow)[1] * (length(mesh_flatten)/length(mesh_list)))
 write.csv(margvar, file = "marginals_variance.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.log.range.nominal
 margrange <- data.frame(do.call('rbind', marg_range))
-margrange$Mesh <- rep(paste("Mesh", 1:length(mesh_list), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.range.nominal[[1]]))
+margrange$Pattern <- rep(paste("Pattern", 1:(length(mesh_flatten)/length(mesh_list)), sep = "_"), 
+                         each = sapply(marg_range, nrow)[1], times = length(mesh_list))
+margrange$Mesh <- rep(paste("Mesh_band", 1:length(mesh_list), sep = "_"), 
+                      each = sapply(marg_range, nrow)[1] * (length(mesh_flatten)/length(mesh_list)))
 write.csv(margrange, file = "marginals_range.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV DIC
 dic <- data.frame(matrix(unlist(list_dic), ncol = 1, byrow = TRUE))
 colnames(dic) <- "DIC"
-dic$Mesh <- paste("Mesh", 1:length(mesh_list), sep = "_")
+dic$Pattern <- rep(paste("Pattern", 1:(length(mesh_flatten)/length(mesh_list)), sep = "_"), 
+                   times = length(mesh_list))
+dic$Mesh <- rep(paste("Mesh_band", 1:length(mesh_list), sep = "_"), 
+                each = length(mesh_flatten)/length(mesh_list))
 write.csv(dic, file = "DIC.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV WAIC
 waic <- data.frame(matrix(unlist(list_waic), ncol = 1, byrow = TRUE))
 colnames(waic) <- "WAIC"
-waic$Mesh <- paste("Mesh", 1:length(mesh_list), sep = "_")
+waic$Pattern <- rep(paste("Pattern", 1:(length(mesh_flatten)/length(mesh_list)), sep = "_"), 
+                    times = length(mesh_list))
+waic$Mesh <- rep(paste("Mesh_band", 1:length(mesh_list), sep = "_"), 
+                 each = length(mesh_flatten)/length(mesh_list))
 write.csv(waic, file = "WAIC.csv")
-
-
 
