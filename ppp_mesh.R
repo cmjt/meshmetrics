@@ -1,12 +1,5 @@
 ## ---- Build mesh based on point locations
 
-## get the point locations for 8 different point patterns in one simulation
-
-points_df <- lapply(
-  unlist(unlist(sim[["points"]], recursive=FALSE), recursive=FALSE), 
-  as.data.frame
-)
-
 ## Mesh 1 -- Mesh 12, with 8 different point patterns, total 96 meshes.
 
 mesh_ls_1 <- list()
