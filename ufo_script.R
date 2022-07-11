@@ -1,6 +1,7 @@
 
 ## packages
 library(sf)
+library(qpdf)
 library(maps)
 library(sp)
 library(INLA)
@@ -109,46 +110,62 @@ for (j in 1:nrow(mesh_mat)){
 ### --------------------------------------------------------------------------->> Model without covariate
 pp.res <- temp
 pp.res.est <- temp
+valid_meshes <- c()
 
 for (k in 1:nrow(mesh_mat)){
-  pp.res[[k]] <- inla(y ~ 0 + b0 + f(i, model = ufo_spde[[k]]),
+  out = tryCatch(
+    {
+    pp.res[[k]] <- inla(y ~ 0 + b0 + f(i, model = ufo_spde[[k]]),
                       family = 'poisson', 
                       data = inla.stack.data(stk.pp[[k]]),
                       control.predictor = list(A = inla.stack.A(stk.pp[[k]])),
                       control.compute = list(dic = TRUE, cpo = TRUE, waic = TRUE),
                       E = inla.stack.data(stk.pp[[k]])$e)
-  # transform
-  pp.res.est[[k]] <- inla.spde.result(inla = pp.res[[k]], name = "i", spde = ufo_spde[[k]], do.transf = TRUE)
+    # transform
+    pp.res.est[[k]] <- inla.spde.result(inla = pp.res[[k]], name = "i", spde = ufo_spde[[k]], do.transf = TRUE)
+    out <- k
+    },
+    error = function(cond) {
+      return(0)
+    }
+  )
+  if (out == k) {
+    valid_meshes = append(valid_meshes, k)
+  }
 }
 
+tempn <- vector("list", length = length(valid_meshes))
 
 ## Projection on a grid
 
 library(lattice)
 library(gridExtra)
 
-gproj <- temp
-g_mean <- temp
-g_sd <- temp
+gproj <- tempn
+g_mean <- tempn
+g_sd <- tempn
 
-for (l in 1:nrow(mesh_mat)) {
-  gproj[[l]] <- inla.mesh.projector(mesh_n[[l]], dims = c(1000, 1000))
-  g_mean[[l]] <- inla.mesh.project(gproj[[l]], pp.res[[l]]$summary.random$i$mean)
-  g_sd[[l]] <- inla.mesh.project(gproj[[l]], pp.res[[l]]$summary.random$i$sd)
+for (k in 1:length(valid_meshes)) {
+  l = valid_meshes[k]
+  gproj[[k]] <- inla.mesh.projector(mesh_n[[l]], dims = c(1000, 1000))
+  g_mean[[k]] <- inla.mesh.project(gproj[[k]], pp.res[[l]]$summary.random$i$mean)
+  g_sd[[k]] <- inla.mesh.project(gproj[[k]], pp.res[[l]]$summary.random$i$sd)
 }
 
 plot_1 <- do.call('grid.arrange',
                   lapply(g_mean,
                          levelplot, col.regions=terrain.colors(16), scales=list(draw=FALSE), 
                          main='latent field mean', xlab='', ylab=''))
-ggsave(path = "ufo_sim_files", filename = "latent_field_mean.png", plot = plot_1)
+ggsave(path = "ufo_sim_files", filename = "latent_field_mean.png", plot = plot_1,
+       units = "in", width = 7, height = 7)
 
 
 plot_2 <- do.call('grid.arrange',
                   lapply(g_sd,
                          levelplot, col.regions=terrain.colors(16), scales=list(draw=FALSE), 
                          main='latent field SD', xlab='', ylab=''))
-ggsave(path = "ufo_sim_files", filename = "latent_field_sd.png", plot = plot_2)
+ggsave(path = "ufo_sim_files", filename = "latent_field_sd.png", plot = plot_2,
+       units = "in", width = 7, height = 7)
 
 dev.off()
 
@@ -156,67 +173,68 @@ dev.off()
 
 dir.create("CSV_files")
 
-list_fixed <- temp
-marg_fixed <- temp
-marg_kappa <- temp
-marg_variance <- temp
-marg_range <- temp
-list_dic <- temp
-list_waic <- temp
+list_fixed <- tempn
+marg_fixed <- tempn
+marg_kappa <- tempn
+marg_variance <- tempn
+marg_range <- tempn
+list_dic <- tempn
+list_waic <- tempn
 
 
-for (f in 1:nrow(mesh_mat)){
-  list_fixed[[f]] <- pp.res[[f]]$summary.fixed
-  marg_fixed[[f]] <- pp.res[[f]]$marginals.fixed[[1]]
-  marg_kappa[[f]] <- pp.res.est[[f]]$marginals.kappa[[1]]
-  marg_variance[[f]] <- pp.res.est[[f]]$marginals.variance.nominal[[1]]
-  marg_range[[f]] <- pp.res.est[[f]]$marginals.range.nominal[[1]]
-  list_dic[[f]] <- pp.res[[f]]$dic$dic
-  list_waic[[f]] <- pp.res[[f]]$waic$waic
+for (k in 1:length(valid_meshes)){
+  f = valid_meshes[k]
+  list_fixed[[k]] <- pp.res[[f]]$summary.fixed
+  marg_fixed[[k]] <- pp.res[[f]]$marginals.fixed[[1]]
+  marg_kappa[[k]] <- pp.res.est[[f]]$marginals.kappa[[1]]
+  marg_variance[[k]] <- pp.res.est[[f]]$marginals.variance.nominal[[1]]
+  marg_range[[k]] <- pp.res.est[[f]]$marginals.range.nominal[[1]]
+  list_dic[[k]] <- pp.res[[f]]$dic$dic
+  list_waic[[k]] <- pp.res[[f]]$waic$waic
 }
 
 ### --------------------------------------------------------------------------->> CSV summary.fixed
 fixed <- data.frame(matrix(unlist(list_fixed), ncol = 7, byrow = TRUE))
 colnames(fixed) <- names(pp.res[[1]]$summary.fixed)
-fixed$Mesh <- paste("Mesh", 1:nrow(mesh_mat), sep = "_")
+fixed$Mesh <- paste("Mesh", valid_meshes, sep = "_")
 write.csv(fixed, file = "CSV_files/summary_fixed.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.fixed
 margfixed <- data.frame(do.call('rbind', marg_fixed))
-margfixed$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res[[1]]$marginals.fixed[[1]]))
+margfixed$Mesh <- rep(paste("Mesh", valid_meshes, sep = "_"), each = nrow(pp.res[[1]]$marginals.fixed[[1]]))
 write.csv(margfixed, file = "CSV_files/marginals_fixed.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.log.kappa
 margkappa <- data.frame(do.call('rbind', marg_kappa))
-margkappa$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.kappa[[1]]))
+margkappa$Mesh <- rep(paste("Mesh", valid_meshes, sep = "_"), each = nrow(pp.res.est[[1]]$marginals.kappa[[1]]))
 write.csv(margkappa, file = "CSV_files/marginals_kappa.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.log.variance.nominal
 margvar <- data.frame(do.call('rbind', marg_variance))
-margvar$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.variance.nominal[[1]]))
+margvar$Mesh <- rep(paste("Mesh", valid_meshes, sep = "_"), each = nrow(pp.res.est[[1]]$marginals.variance.nominal[[1]]))
 write.csv(margvar, file = "CSV_files/marginals_variance.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.log.range.nominal
 margrange <- data.frame(do.call('rbind', marg_range))
-margrange$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.range.nominal[[1]]))
+margrange$Mesh <- rep(paste("Mesh", valid_meshes, sep = "_"), each = nrow(pp.res.est[[1]]$marginals.range.nominal[[1]]))
 write.csv(margrange, file = "CSV_files/marginals_range.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV DIC
 dic <- data.frame(matrix(unlist(list_dic), ncol = 1, byrow = TRUE))
 colnames(dic) <- "DIC"
-dic$Mesh <- paste("Mesh", 1:nrow(mesh_mat), sep = "_")
+dic$Mesh <- paste("Mesh", valid_meshes, sep = "_")
 write.csv(dic, file = "CSV_files/DIC.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV WAIC
 waic <- data.frame(matrix(unlist(list_waic), ncol = 1, byrow = TRUE))
 colnames(waic) <- "WAIC"
-waic$Mesh <- paste("Mesh", 1:nrow(mesh_mat), sep = "_")
+waic$Mesh <- paste("Mesh", valid_meshes, sep = "_")
 write.csv(waic, file = "CSV_files/WAIC.csv")
 
 
@@ -236,6 +254,7 @@ US20 <- st_read("data/cb_2020_us_county_20m/cb_2020_us_county_20m.shp")
 conti_US20 <- US20[!(US20$STATEFP %in% c("02","15","72")), ]
 ### 2020 Census Demographic Data By County, downloaded from https://www.dataemporium.com/dataset/254/
 census20 <- read.csv("data/US_2020_census.csv")
+colnames(census20)[1] = "STATE_ABBR"
 contiguous <- subset(census20, census20$STATE_ABBR != "AK" & census20$STATE_ABBR != "HI" & census20$STATE_ABBR != "PR")
 pop20 <- contiguous[, 1:3]
 ### append total population to US20
@@ -256,6 +275,7 @@ covs <- temp
 stk.cov <- temp
 pp.cov <- temp
 pp.cov.est <- temp
+valid_meshes <- c()
 
 for (l in 1:nrow(mesh_mat)){
   pop_mesh[[l]] <- sp::over(SpatialPoints(mesh_n[[l]]$loc[,1:2], 
@@ -269,39 +289,55 @@ for (l in 1:nrow(mesh_mat)){
                                             list(i = 1:nv[l])),
                              tag = 'pp_cov')
   # fit model with a covariate
-  pp.cov[[l]] <- inla(y ~ 0 + b0 + pop + f(i, model = ufo_spde[[l]]), 
+  out <- tryCatch(
+    {
+    pp.cov[[l]] <- inla(y ~ 0 + b0 + pop + f(i, model = ufo_spde[[l]]), 
                       family = 'poisson', 
                       data = inla.stack.data(stk.cov[[l]]), 
-                      control.predictor = list(A = inla.stack.A(stk.cov[[l]])), 
+                      control.predictor = list(A = inla.stack.A(stk.cov[[l]])),
+                      control.compute = list(dic = TRUE, cpo = TRUE, waic = TRUE),
                       E = inla.stack.data(stk.cov[[l]])$e)
-  pp.cov.est[[l]] <- inla.spde.result(inla = pp.cov[[l]], name = "i", spde = ufo_spde[[l]], do.transf = TRUE)
-  
+    pp.cov.est[[l]] <- inla.spde.result(inla = pp.cov[[l]], name = "i", spde = ufo_spde[[l]], do.transf = TRUE)
+    out <- l
+    },
+    error = function(cond) {
+      return(0)
+    }
+  )
+  if (out == l) {
+    valid_meshes <- append(valid_meshes,l)
+  }
 }
 
+tempn <- vector("list", length = length(valid_meshes))
 
 
-gproj_cov <- temp
-g_mean_cov <- temp
-g_sd_cov <- temp
 
-for (g in 1:nrow(mesh_mat)) {
-  gproj_cov[[g]] <- inla.mesh.projector(mesh_n[[g]], dims = c(1000, 1000))
-  g_mean_cov[[g]] <- inla.mesh.project(gproj_cov[[g]], pp.cov[[g]]$summary.random$i$mean)
-  g_sd_cov[[g]] <- inla.mesh.project(gproj_cov[[g]], pp.cov[[g]]$summary.random$i$sd)
+gproj_cov <- tempn
+g_mean_cov <- tempn
+g_sd_cov <- tempn
+
+for (k in 1:length(valid_meshes)) {
+  g = valid_meshes[k]
+  gproj_cov[[k]] <- inla.mesh.projector(mesh_n[[g]], dims = c(1000, 1000))
+  g_mean_cov[[k]] <- inla.mesh.project(gproj_cov[[k]], pp.cov[[g]]$summary.random$i$mean)
+  g_sd_cov[[k]] <- inla.mesh.project(gproj_cov[[k]], pp.cov[[g]]$summary.random$i$sd)
 }
 
 plot_m_cov <- do.call('grid.arrange',
                       lapply(g_mean_cov,
                              levelplot, col.regions=terrain.colors(16), scales=list(draw=FALSE), 
                              main='latent field mean', xlab='', ylab=''))
-ggsave(path = "ufo_sim_files", filename = "latent_field_mean_cov.png", plot_m_cov)
+ggsave(path = "ufo_sim_files", filename = "latent_field_mean_cov.png", plot_m_cov,
+       units = "in", width = 7, height = 7)
 
 
 plot_sd_cov <- do.call('grid.arrange',
                        lapply(g_sd_cov,
                               levelplot, col.regions=terrain.colors(16), scales=list(draw=FALSE), 
                               main='latent field SD', xlab='', ylab=''))
-ggsave(path = "ufo_sim_files", filename = "latent_field_sd_cov.png", plot_sd_cov)
+ggsave(path = "ufo_sim_files", filename = "latent_field_sd_cov.png", plot_sd_cov,
+       units = "in", width = 7, height = 7)
 
 
 
@@ -309,67 +345,68 @@ ggsave(path = "ufo_sim_files", filename = "latent_field_sd_cov.png", plot_sd_cov
 
 dir.create("cov_CSV_files")
 
-list_fixed <- temp
-marg_fixed <- temp
-marg_kappa <- temp
-marg_variance <- temp
-marg_range <- temp
-list_dic <- temp
-list_waic <- temp
+list_fixed <- tempn
+marg_fixed <- tempn
+marg_kappa <- tempn
+marg_variance <- tempn
+marg_range <- tempn
+list_dic <- tempn
+list_waic <- tempn
 
 
-for (f in 1:nrow(mesh_mat)){
-  list_fixed[[f]] <- pp.cov[[f]]$summary.fixed
-  marg_fixed[[f]] <- pp.cov[[f]]$marginals.fixed[[1]]
-  marg_kappa[[f]] <- pp.cov.est[[f]]$marginals.kappa[[1]]
-  marg_variance[[f]] <- pp.cov.est[[f]]$marginals.variance.nominal[[1]]
-  marg_range[[f]] <- pp.cov.est[[f]]$marginals.range.nominal[[1]]
-  list_dic[[f]] <- pp.cov[[f]]$dic$dic
-  list_waic[[f]] <- pp.cov[[f]]$waic$waic
+for (k in 1:length(valid_meshes)){
+  f = valid_meshes[k]
+  list_fixed[[k]] <- pp.cov[[f]]$summary.fixed
+  marg_fixed[[k]] <- pp.cov[[f]]$marginals.fixed[[1]]
+  marg_kappa[[k]] <- pp.cov.est[[f]]$marginals.kappa[[1]]
+  marg_variance[[k]] <- pp.cov.est[[f]]$marginals.variance.nominal[[1]]
+  marg_range[[k]] <- pp.cov.est[[f]]$marginals.range.nominal[[1]]
+  list_dic[[k]] <- pp.cov[[f]]$dic$dic
+  list_waic[[k]] <- pp.cov[[f]]$waic$waic
 }
 
 ### --------------------------------------------------------------------------->> CSV summary.fixed
 fixed <- data.frame(matrix(unlist(list_fixed), ncol = 7, byrow = TRUE))
 colnames(fixed) <- names(pp.res[[1]]$summary.fixed)
-fixed$Mesh <- paste("Mesh", 1:nrow(mesh_mat), sep = "_")
+fixed$Mesh <- paste("Mesh", valid_meshes, sep = "_")
 write.csv(fixed, file = "cov_CSV_files/summary_fixed_cov.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.fixed
 margfixed <- data.frame(do.call('rbind', marg_fixed))
-margfixed$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res[[1]]$marginals.fixed[[1]]))
+margfixed$Mesh <- rep(paste("Mesh", valid_meshes, sep = "_"), each = nrow(pp.res[[1]]$marginals.fixed[[1]]))
 write.csv(margfixed, file = "cov_CSV_files/marginals_fixed_cov.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.log.kappa
 margkappa <- data.frame(do.call('rbind', marg_kappa))
-margkappa$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.kappa[[1]]))
+margkappa$Mesh <- rep(paste("Mesh", valid_meshes, sep = "_"), each = nrow(pp.res.est[[1]]$marginals.kappa[[1]]))
 write.csv(margkappa, file = "cov_CSV_files/marginals_kappa_cov.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.log.variance.nominal
 margvar <- data.frame(do.call('rbind', marg_variance))
-margvar$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.variance.nominal[[1]]))
+margvar$Mesh <- rep(paste("Mesh", valid_meshes, sep = "_"), each = nrow(pp.res.est[[1]]$marginals.variance.nominal[[1]]))
 write.csv(margvar, file = "cov_CSV_files/marginals_variance_cov.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV marginals.log.range.nominal
 margrange <- data.frame(do.call('rbind', marg_range))
-margrange$Mesh <- rep(paste("Mesh", 1:nrow(mesh_mat), sep = "_"), each = nrow(pp.res.est[[1]]$marginals.range.nominal[[1]]))
+margrange$Mesh <- rep(paste("Mesh", valid_meshes, sep = "_"), each = nrow(pp.res.est[[1]]$marginals.range.nominal[[1]]))
 write.csv(margrange, file = "cov_CSV_files/marginals_range_cov.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV DIC
 dic <- data.frame(matrix(unlist(list_dic), ncol = 1, byrow = TRUE))
 colnames(dic) <- "DIC"
-dic$Mesh <- paste("Mesh", 1:nrow(mesh_mat), sep = "_")
+dic$Mesh <- paste("Mesh", valid_meshes, sep = "_")
 write.csv(dic, file = "cov_CSV_files/DIC_cov.csv")
 
 
 ### --------------------------------------------------------------------------->> CSV WAIC
 waic <- data.frame(matrix(unlist(list_waic), ncol = 1, byrow = TRUE))
 colnames(waic) <- "WAIC"
-waic$Mesh <- paste("Mesh", 1:nrow(mesh_mat), sep = "_")
+waic$Mesh <- paste("Mesh", valid_meshes, sep = "_")
 write.csv(waic, file = "cov_CSV_files/WAIC_cov.csv")
 
 

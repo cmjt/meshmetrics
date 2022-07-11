@@ -2,6 +2,7 @@ url <- "https://gist.githubusercontent.com/cmjt/9a5e43cce69a3babb129b0a448e65752
 horse <- read.csv(url)
 source("functions.r")
 library(sp)
+library(plotrix)
 library(INLA)
 library(ggplot2)
 library(patchwork)
