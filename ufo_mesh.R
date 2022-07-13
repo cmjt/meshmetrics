@@ -34,6 +34,29 @@ mesh_info <- function(mesh_ls){
 
 x <- mesh_info(mesh_n)
 
+## Write the mean and sd of the meshes to CSV
+rr_mean <- lapply(x$mesh_attr, function (y) mean(y$triangles$rr))
+rr_sd <- lapply(x$mesh_attr, function (y) sd(y$triangles$rr))
+re_mean <- lapply(x$mesh_attr, function (y) mean(y$triangles$re))
+re_sd <- lapply(x$mesh_attr, function (y) sd(y$triangles$re))
+n_triangles <- lapply(mesh_n, function (y) y$n)
+
+mesh_attrs <- vector("list", length = 5)
+mesh_attrs[[1]] <- rr_mean
+mesh_attrs[[2]] <- rr_sd
+mesh_attrs[[3]] <- re_mean
+mesh_attrs[[4]] <- re_sd
+mesh_attrs[[5]] <- n_triangles
+
+## create a file to save all the plots
+dir.create("ufo_sim_files")
+
+### --------------------------------------------------------------------------->> Mesh attributes
+fixed <- data.frame(matrix(unlist(mesh_attrs), ncol = 5, byrow = FALSE))
+colnames(fixed) <- c("rr_mean","rr_sd", "re_mean", "re_sd", "n_triangles")
+fixed$Mesh <- paste("Mesh", 1:length(mesh_n), sep = "_")
+write.csv(fixed, file = "ufo_sim_files/mesh_attributes.csv")
+
 
 ## functions to visual the mesh attributes
 
@@ -56,8 +79,6 @@ re_func <- function(mesh_attr){
 }
 
 
-## create a file to save all the plots
-dir.create("ufo_sim_files")
 
 ## plot the mesh
 
