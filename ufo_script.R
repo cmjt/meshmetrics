@@ -233,8 +233,8 @@ list_fixed_stelfi <- tempn
 list_sd_stelfi <- tempn
 for (k in 1:length(valid_meshes_stelfi)){
   f = valid_meshes_INLA[k]
-  list_fixed_stelfi[[k]] <- stelfi.fit[[k]]$value
-  list_sd_stelfi[[k]] <- stelfi.fit[[k]]$sd
+  list_fixed_stelfi[[k]] <- stelfi.fit[[f]]$value
+  list_sd_stelfi[[k]] <- stelfi.fit[[f]]$sd
 }
 
 ### --------------------------------------------------------------------------->> CSV summary.fixed (INLA)
