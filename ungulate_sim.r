@@ -30,7 +30,8 @@ win <- as.owin(sp)
 sets <- expand.grid(data.frame(beta = c(5, 2)/748, ## per unit area
                                var = c(5, 0.1),
                                rho = c(5, 0.2)))
-RFoptions(install = "no")
+## stop sking to update
+RandomFieldsUtils::RFoptions(install = "no")
 ## iterate over k for seeds
 set.seed(4321 + k)
 ## simulate  8 different point pattern "sets"
