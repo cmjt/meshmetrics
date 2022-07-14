@@ -1,5 +1,6 @@
 
 ## packages
+devtools::load_all("stelfi")
 library(sf)
 library(qpdf)
 library(maps)
@@ -49,15 +50,13 @@ source("ufo_mesh.R")
 
 ### --------------------------------------------------------------------------->> Dual Mesh and Weights
 temp <- vector("list", length = nrow(mesh_mat))
-n <- c() # number of observations
 nv <- c() # number of vertices in the mesh
 dual_mesh <- temp
 mesh_weight <- temp
 ufo_spde <- temp
+n <- nrow(ufo) # number of observations
 
 for (i in 1:nrow(mesh_mat)) {
-  # number of observations
-  n <- nrow(ufo)
   # number of vertices in the mesh
   nv[i] <- mesh_n[[i]]$n
   # create the dual mesh polygons
@@ -66,13 +65,7 @@ for (i in 1:nrow(mesh_mat)) {
   usabdy_sp <- SpatialPolygons(list(Polygons(list(Polygon(usa_utm)), ID = "1")))
   usabdy_sp <- gBuffer(usabdy_sp, byid = TRUE, width = 0)
   # compute intersection between each polygon
-  mesh_weight[[i]] <- sapply(1:length(dual_mesh[[i]]), 
-                             function(x) {
-                               if (gIntersects(dual_mesh[[i]][x, ], usabdy_sp)) 
-                                 return(gArea(gIntersection(dual_mesh[[i]][x, ], usabdy_sp)))
-                               else 
-                                 return(0) 
-                             })
+  mesh_weight[[i]] <- stelfi::get_weights(mesh_n[[i]], usa_utm)$weights
   # set up the SPDE model
   ufo_spde[[i]] <- inla.spde2.pcmatern(mesh = mesh_n[[i]], 
                                        alpha = 2,
