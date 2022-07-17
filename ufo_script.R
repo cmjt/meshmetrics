@@ -40,7 +40,7 @@ ufo_sp <- spTransform(ufo_locs,
 # US region / domain
 usa_utm <- spTransform(region, 
                        CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"))
-
+bound <- inla.sp2segment(usa_utm)
 
 ### --------------------------------------------------------------------------->> Mesh Construction 
 ### We compare six results for the ufo dataset based on the six different meshes
@@ -59,8 +59,9 @@ results$sd_radius_edge <- sapply(attrs, function(x) sd(x$triangles$radius_edge))
 results$mean_radius_ratio <- sapply(attrs, function(x) mean(x$triangles$radius_ratio))
 results$sd_radius_ratio <- sapply(attrs, function(x) sd(x$triangles$radius_ratio))
 
+points <- locs
+coordinates(locs) <- c("x", "y")
 for (i in 1:length(tmp)) {
-  coordinates(locs) <- c("x", "y")
   ## Define SPDE prior
   matern <- INLA::inla.spde2.pcmatern(tmp[[i]],
                                       prior.sigma = c(0.1, 0.01),
@@ -71,15 +72,29 @@ for (i in 1:length(tmp)) {
   ## effect and Intercept)
   cmp <- coordinates ~ mySmooth(main = coordinates, model = matern) + Intercept(1)
   ## Fit the model (with int.strategy = "eb" to make the example take less time)
-  t_bru <- system.time(fit_bru <- lgcp(cmp, locs,
+  out <- tryCatch(
+    {
+    t_bru <- system.time(fit_bru <- lgcp(cmp, locs,
                                         samplers = usa_utm,
                                         domain = list(coordinates = tmp[[i]]),
                                         options = list(control.inla = list(int.strategy = "eb")))
+    )
+    results[i, 1:4] <- c(fit_bru$summary.fixed[, 1], fit_bru$summary.hyperpar[, 1], as.numeric(t_bru[3]))
+    },
+    error = function(cond) {
+      results[i, 1:4] <- rep(NA,4)
+    }
   )
-  results[(i + j - 1), 1:4] <- c(fit_bru$summary.fixed[, 1], fit_bru$summary.hyperpar[, 1], as.numeric(t_bru[3]))
   ## Stelfi fit
-  t_stelfi <- system.time(fit_stelfi <- stelfi::fit_lgcp(locs = points[[j]], sp = usa_utm, smesh = tmp[[i]]))
-  results[(i + j - 1), 5:8] <- c(get_coefs(fit_stelfi)[c(1, 4:5), 1], as.numeric(t_stelfi[3]))
+  out <- tryCatch(
+    {
+    t_stelfi <- system.time(fit_stelfi <- stelfi::fit_lgcp(locs = points, sp = usa_utm, smesh = tmp[[i]]))
+    results[i, 5:8] <- c(get_coefs(fit_stelfi)[c(1, 4:5), 1], as.numeric(t_stelfi[3]))
+    },
+    error = function(cond) {
+      results[i, 5:8] <- rep(NA,4)
+    }
+  )
 }
 
 write.csv(results, file = paste("res_", k, ".csv", sep = ""))

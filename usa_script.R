@@ -83,15 +83,29 @@ for (i in 1:length(tmp)) {
     ## effect and Intercept)
     cmp <- coordinates ~ mySmooth(main = coordinates, model = matern) + Intercept(1)
     ## Fit the model (with int.strategy = "eb" to make the example take less time)
-    t_bru <- system.time(fit_bru <- lgcp(cmp, locs,
-                                         samplers = usa_utm,
-                                         domain = list(coordinates = tmp[[i]]),
-                                         options = list(control.inla = list(int.strategy = "eb")))
+    out <- tryCatch(
+      {
+        t_bru <- system.time(fit_bru <- lgcp(cmp, locs,
+                                             samplers = usa_utm,
+                                             domain = list(coordinates = tmp[[i]]),
+                                             options = list(control.inla = list(int.strategy = "eb")))
+        )
+        results[((i-1)*length(points) + j), 1:4] <- c(fit_bru$summary.fixed[, 1], fit_bru$summary.hyperpar[, 1], as.numeric(t_bru[3]))
+      },
+      error = function(cond) {
+        results[((i-1)*length(points) + j), 1:4] <- rep(NA,4)
+      }
     )
-    results[(i + j - 1), 1:4] <- c(fit_bru$summary.fixed[, 1], fit_bru$summary.hyperpar[, 1], as.numeric(t_bru[3]))
     ## Stelfi fit
-    t_stelfi <- system.time(fit_stelfi <- stelfi::fit_lgcp(locs = points[[j]], sp = usa_utm, smesh = tmp[[i]]))
-    results[(i + j - 1), 5:8] <- c(get_coefs(fit_stelfi)[c(1, 4:5), 1], as.numeric(t_stelfi[3]))
+    out <- tryCatch(
+      {
+        t_stelfi <- system.time(fit_stelfi <- stelfi::fit_lgcp(locs = points[[j]], sp = usa_utm, smesh = tmp[[i]]))
+        results[((i-1)*length(points) + j), 5:8] <- c(get_coefs(fit_stelfi)[c(1, 4:5), 1], as.numeric(t_stelfi[3]))
+      },
+      error = function(cond) {
+        results[((i-1)*length(points) + j), 5:8] <- rep(NA,4)
+      }
+    )
   }
 }
 
