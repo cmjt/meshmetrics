@@ -51,12 +51,6 @@ mesh_attrs[[5]] <- n_triangles
 ## create a file to save all the plots
 dir.create("ufo_sim_files")
 
-### --------------------------------------------------------------------------->> Mesh attributes
-fixed <- data.frame(matrix(unlist(mesh_attrs), ncol = 5, byrow = FALSE))
-colnames(fixed) <- c("rr_mean","rr_sd", "re_mean", "re_sd", "n_triangles")
-fixed$Mesh <- paste("Mesh", 1:length(mesh_n), sep = "_")
-write.csv(fixed, file = "ufo_sim_files/mesh_attributes.csv")
-
 
 ## functions to visual the mesh attributes
 
