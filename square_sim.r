@@ -11,9 +11,8 @@ library(stelfi)
 library(spatstat)
 library(maptools) ## need for sp --> owin
 ## region data
-url <- "https://gist.githubusercontent.com/cmjt/9a5e43cce69a3babb129b0a448e65752/raw/8653d11cb6ace667a3f5683982ae82366a3ac5d2/horse.csv"
-horse <- read.csv(url)
-sp <- sp::SpatialPolygons(list(sp::Polygons(list(sp::Polygon(horse)), '0')))
+domain <- data.frame(x = c(0, 2, 2, 0, 0),y = c(0, 0, 2, 2, 0))
+sp <- sp::SpatialPolygons(list(sp::Polygons(list(sp::Polygon(domain)), '0')))
 bound <- inla.sp2segment(sp)
 win <- as.owin(sp)
 
@@ -27,9 +26,9 @@ win <- as.owin(sp)
 ######****************************#################
 ######**8 PARAMETER SETS***********#################
 ######****************************#################
-sets <- expand.grid(data.frame(beta = c(100, 0.5)/area.owin(win), ## per unit area
+sets <- expand.grid(data.frame(beta = c(15, 5)/area.owin(win), ## per unit area
                                var = c(2, 0.01),
-                               rho = c(20, 0.02)))
+                               rho = c(20, 0.2)))
 ## stop sking to update
 RandomFieldsUtils::RFoptions(install = "no")
 ## iterate over k for seeds
@@ -38,18 +37,15 @@ set.seed(4321 + k)
 points <- list()
 for (i in 1:nrow(sets)) {
     X <- rLGCP("matern", mu = sets[i, 1],
-               var = sets[i, 2], scale = sets[i, 3]/sqrt(8),
-               nu = 1,
+               var = sets[i, 2], scale = sets[i, 3]/sqrt(8), nu = 1,
                win = win)
     Lamda <- attr(X, 'Lambda')
     points[[i]] <- data.frame(x = X$x, y = X$y)
 }
 
 ## mesh construction
-tmp <- lapply(seq(0.5, 20, length.out = 16), function(x) INLA::inla.mesh.create(boundary = bound,
-                                                                             extend = TRUE,
-                                                                             cutoff = 1,
-                                                                             refine = list(max.edge = x)))
+tmp <- lapply(seq(0.05, 2, length.out = 16), function(x) INLA::inla.mesh.2d(boundary = bound,
+                                                                             max.edge = c(x, 3*x)))
 ## mesh attributed
 attrs <- lapply(tmp, stelfi:::meshmetrics)
 ##  model fitting
@@ -63,7 +59,6 @@ results$sd_radius_ratio <- rep(sapply(attrs, function(x) sd(x$triangles$radius_r
 results$true_beta <- rep(sets[,1], times = length(tmp))
 results$true_var <- rep(sets[,2], times = length(tmp))
 results$true_rho <- rep(sets[,3], times = length(tmp))
-
 
 ## fit models
 for (i in 1:length(tmp)) {
@@ -92,4 +87,4 @@ for (i in 1:length(tmp)) {
     }
 }
 
-write.csv(results, file = paste("res_ungulate", k, ".csv", sep = ""))
+write.csv(results, file = paste("res_square_", k, ".csv", sep = ""))
