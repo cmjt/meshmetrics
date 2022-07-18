@@ -33,11 +33,12 @@ region <- as(sf::st_as_sf(maps::map("usa", fill = TRUE, plot = FALSE)), "Spatial
 
 ## convert the existing lat-long coordinates to UTM (easting-northing system)
 usa_utm <- spTransform(region, 
-                       CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"))
+                       #CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"))
+                       CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=km +no_defs"))
 
-sets <- expand.grid(data.frame(beta = c(-24,-21), ## per unit area
+sets <- expand.grid(data.frame(beta = c(-9,-7), ## per unit area # -24 # -22
                                var = c(5, 0.1),
-                               rho = c(50000, 10000)))
+                               rho = c(50, 10))) # 50,000 10,000
 
 
 ### Construct Simulations
@@ -55,8 +56,9 @@ for (i in 1:nrow(sets)) {
   Lamda <- attr(X, 'Lambda')
   points[[i]] <- data.frame(x = X$x, y = X$y)
 }
-## mesh construction (9 for now)
-tmp <- lapply(seq(200000, 2000000, length.out = 9), function(x) INLA::inla.mesh.2d(boundary = bound,
+## mesh construction (5 for now)
+#tmp <- lapply(seq(200000, 1000000, length.out = 5), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
+tmp <- lapply(seq(200, 1000, length.out = 5), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
                                                                         max.edge = c(x, 2 * x)))
 attrs <- lapply(tmp, stelfi:::meshmetrics)
 
@@ -68,6 +70,8 @@ results$mean_radius_edge <- rep(sapply(attrs, function(x) mean(x$triangles$radiu
 results$sd_radius_edge <- rep(sapply(attrs, function(x) sd(x$triangles$radius_edge)), each = length(points))
 results$mean_radius_ratio <- rep(sapply(attrs, function(x) mean(x$triangles$radius_ratio)), each = length(points))
 results$sd_radius_ratio <- rep(sapply(attrs, function(x) sd(x$triangles$radius_ratio)), each = length(points))
+results$n_triangles <- rep(sapply(tmp, function(x) x$n), each = length(points))
+results$set <- rep(1:length(points), length(tmp))
 
 for (i in 1:length(tmp)) {
   for(j in 1:length(points)) {
@@ -75,8 +79,8 @@ for (i in 1:length(tmp)) {
     coordinates(locs) <- c("x", "y")
     ## Define SPDE prior
     matern <- INLA::inla.spde2.pcmatern(tmp[[i]],
-                                        prior.sigma = c(0.1, 0.01),
-                                        prior.range = c(0.01, 0.01)
+                                        prior.sigma = c(1, 0.01),
+                                        prior.range = c(100000, 0.01)
     )
     
     ## Define domain of the LGCP as well as the model components (spatial SPDE
@@ -108,8 +112,8 @@ for (i in 1:length(tmp)) {
     )
   }
 }
-
-write.csv(results, file = paste("res_", k, ".csv", sep = ""))
+dir.create("USA_files_km")
+write.csv(results, file = paste("USA_files/res_usa", k, ".csv", sep = ""))
 
 
 #### OLD INLA code

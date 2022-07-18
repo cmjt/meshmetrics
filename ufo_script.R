@@ -36,17 +36,22 @@ coordinates(ufo_locs) <- c("city_longitude", "city_latitude")
 proj4string(ufo_locs) <- CRS('+init=epsg:4326')
 ## using North America Lambert Conformal Conic
 ufo_sp <- spTransform(ufo_locs,
-                      CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs "))
+                      #CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs "))
+                      CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=km +no_defs "))
 # US region / domain
 usa_utm <- spTransform(region, 
-                       CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"))
+                       #CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"))
+                       CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=km +no_defs"))
 bound <- inla.sp2segment(usa_utm)
+locs <- coordinates(ufo_sp)
+locs <- data.frame(x = locs[,1], y = locs[,2])
 
 ### --------------------------------------------------------------------------->> Mesh Construction 
 ### We compare six results for the ufo dataset based on the six different meshes
 ### mesh_val <- c(loc, boundary, max.edge, cutoff)
 #source("ufo_mesh.R")
-tmp <- lapply(seq(200000, 1000000, length.out = 9), function(x) INLA::inla.mesh.2d(boundary = bound,
+#tmp <- lapply(seq(200000, 1000000, length.out = 30), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
+tmp <- lapply(seq(200, 1000, length.out = 20), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
                                                                                    max.edge = c(x, 2 * x)))
 
 attrs <- lapply(tmp, stelfi:::meshmetrics)
@@ -58,6 +63,7 @@ results$mean_radius_edge <- sapply(attrs, function(x) mean(x$triangles$radius_ed
 results$sd_radius_edge <- sapply(attrs, function(x) sd(x$triangles$radius_edge))
 results$mean_radius_ratio <- sapply(attrs, function(x) mean(x$triangles$radius_ratio))
 results$sd_radius_ratio <- sapply(attrs, function(x) sd(x$triangles$radius_ratio))
+results$n_triangles <- sapply(tmp, function(x) x$n)
 
 points <- locs
 coordinates(locs) <- c("x", "y")
@@ -65,7 +71,7 @@ for (i in 1:length(tmp)) {
   ## Define SPDE prior
   matern <- INLA::inla.spde2.pcmatern(tmp[[i]],
                                       prior.sigma = c(0.1, 0.01),
-                                      prior.range = c(0.01, 0.01)
+                                      prior.range = c(100, 0.01)
   )
   
   ## Define domain of the LGCP as well as the model components (spatial SPDE
@@ -97,7 +103,7 @@ for (i in 1:length(tmp)) {
   )
 }
 
-write.csv(results, file = paste("res_", k, ".csv", sep = ""))
+write.csv(results, file = paste("res_ufo", ".csv", sep = ""))
 
 # ### --------------------------------------------------------------------------->> Dual Mesh and Weights
 # temp <- vector("list", length = nrow(mesh_mat))
