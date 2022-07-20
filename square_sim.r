@@ -26,7 +26,7 @@ win <- as.owin(sp)
 ######****************************#################
 ######**8 PARAMETER SETS***********#################
 ######****************************#################
-sets <- expand.grid(data.frame(beta = c(15, 5)/area.owin(win), ## per unit area
+sets <- expand.grid(data.frame(beta = log(c(25, 5)/area.owin(win)), ## per unit area
                                var = c(2, 0.01),
                                rho = c(20, 0.2)))
 ## stop sking to update
@@ -44,8 +44,8 @@ for (i in 1:nrow(sets)) {
 }
 
 ## mesh construction
-tmp <- lapply(seq(0.05, 2, length.out = 16), function(x) INLA::inla.mesh.2d(boundary = bound,
-                                                                             max.edge = c(x, 3*x)))
+tmp <- lapply(seq(0.05, 2, length.out = 8), function(x) INLA::inla.mesh.create(boundary = bound,
+                                                                             refine= list(max.edge = x)))
 ## mesh attributed
 attrs <- lapply(tmp, stelfi:::meshmetrics)
 ##  model fitting
