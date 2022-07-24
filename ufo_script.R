@@ -2,7 +2,6 @@
 ## packages
 devtools::load_all("stelfi")
 library(sf)
-library(qpdf)
 library(maps)
 library(sp)
 library(INLA)
@@ -21,9 +20,8 @@ library(inlabru)
 ## read in data
 ufo <- readr::read_csv("data/ufo.csv")
 ## usa map
-states <- map_data("state")
 usa <- map_data('usa')
-usa_region <- data.frame(Longitude = usa$long, Latitude = usa$lat)
+#usa_region <- data.frame(Longitude = usa$long, Latitude = usa$lat)
 
 ## define region and points
 region <- as(sf::st_as_sf(maps::map("usa", fill = TRUE, plot = FALSE)), "Spatial")
@@ -51,8 +49,27 @@ locs <- data.frame(x = locs[,1], y = locs[,2])
 ### mesh_val <- c(loc, boundary, max.edge, cutoff)
 #source("ufo_mesh.R")
 #tmp <- lapply(seq(200000, 1000000, length.out = 30), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
-tmp <- lapply(seq(200, 1000, length.out = 20), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
+tmp <- lapply(seq(150, 1050, length.out = 10), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
                                                                                    max.edge = c(x, 2 * x)))
+# create random mesh nodes
+win <- as.owin.SpatialPolygons(usa_utm)
+## choose resolution
+set.seed(4321)
+points <- list()
+for (i in 1:10) {
+  X <- rLGCP("matern", mu = -9.25,
+             var = 0.1, scale = 100, nu = 1,
+             win = win)
+  Lamda <- attr(X, 'Lambda')
+  points[[i]] <- data.frame(x = X$x, y = X$y)
+}
+
+tmp2 = lapply(seq(150, 1050, length.out = 10), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
+                                                                              loc = points[[(as.integer(0.01*x - 0.5))]],
+                                                                              cutoff = 0.2*x,
+                                                                              max.edge = c(x, 2 * x)))
+
+tmp = append(tmp, tmp2)
 
 attrs <- lapply(tmp, stelfi:::meshmetrics)
 results <- as.data.frame(matrix(0, nrow = length(tmp), ncol = 8))
@@ -61,8 +78,10 @@ names(results) <- c(paste("bru_", 1:3, sep = ""),"bru_time", paste("stelfi_", 1:
 ## append mesh attributes summaries
 results$mean_radius_edge <- sapply(attrs, function(x) mean(x$triangles$radius_edge))
 results$sd_radius_edge <- sapply(attrs, function(x) sd(x$triangles$radius_edge))
+results$uq_radius_edge <- sapply(attrs, function(x) quantile(x$triangles$radius_edge)[4])
 results$mean_radius_ratio <- sapply(attrs, function(x) mean(x$triangles$radius_ratio))
 results$sd_radius_ratio <- sapply(attrs, function(x) sd(x$triangles$radius_ratio))
+results$uq_radius_ratio <- sapply(attrs, function(x) quantile(x$triangles$radius_ratio)[4])
 results$n_triangles <- sapply(tmp, function(x) x$n)
 
 points <- locs
@@ -370,176 +389,6 @@ write.csv(results, file = paste("res_ufo", ".csv", sep = ""))
 
 
 ### --------------------------------------------------------------------------->> Adding a covariate
-
-# ### US 2020 Cartographic Boundary Files
-# ### downloaded from https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_county_20m.zip
-# US20 <- st_read("data/cb_2020_us_county_20m/cb_2020_us_county_20m.shp")
-# # leave out AK, HI, and PR (state FIPS: 02, 15, and 72)
-# conti_US20 <- US20[!(US20$STATEFP %in% c("02","15","72")), ]
-# ### 2020 Census Demographic Data By County, downloaded from https://www.dataemporium.com/dataset/254/
-# census20 <- read.csv("data/US_2020_census.csv")
-# colnames(census20)[1] = "STATE_ABBR"
-# contiguous <- subset(census20, census20$STATE_ABBR != "AK" & census20$STATE_ABBR != "HI" & census20$STATE_ABBR != "PR")
-# pop20 <- contiguous[, 1:3]
-# ### append total population to US20
-# conti_US20 <- arrange(conti_US20, NAMELSAD)
-# pop20 <- arrange(pop20, COUNTY)
-# conti_US20$TOT_POP <- pop20$TOTAL_POPULATION
-# ### create shape object with state polygons
-# us_pop20 <- conti_US20
-# # us_pop20 <- unionSpatialPolygons(as(us_pop20, "Spatial"), IDs = us_pop20$STATEFP)
-# us_pop20 <- as(us_pop20, "Spatial")
-# us_pop20 <- spTransform(us_pop20, 
-#                         CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs "))
-# 
-# ### model with population as covariate
-# pop_mesh <- temp
-# covs <- temp
-# stk.cov <- temp
-# pp.cov <- temp
-# pp.cov.est <- temp
-# pp.cov.times <- temp
-# valid_meshes_INLA <- c()
-# 
-# for (l in 1:nrow(mesh_mat)){
-#   pop_mesh[[l]] <- sp::over(SpatialPoints(mesh_n[[l]]$loc[,1:2], 
-#                                           proj4string = CRS(proj4string(ufo_sp))), us_pop20)$TOT_POP
-#   pop_obs <- sp::over(ufo_sp, us_pop20)$TOT_POP
-#   covs[[l]] <- data.frame(pop = c(pop_mesh[[l]], pop_obs))
-#   # data stack includes the covariate
-#   stk.cov[[l]] <- inla.stack(data = list(y = y.pp[[l]], e = e.pp[[l]]), 
-#                              A = list(1, A.pp[[l]]),
-#                              effects = list(list(b0 = rep(1, nv[l] + n), pop = covs[[l]]$pop), 
-#                                             list(i = 1:nv[l])),
-#                              tag = 'pp_cov')
-#   # fit model with a covariate
-#   start <- Sys.time()
-#   out <- tryCatch(
-#     {
-#     pp.cov[[l]] <- inla(y ~ 0 + b0 + pop + f(i, model = ufo_spde[[l]]), 
-#                       family = 'poisson', 
-#                       data = inla.stack.data(stk.cov[[l]]), 
-#                       control.predictor = list(A = inla.stack.A(stk.cov[[l]])),
-#                       control.compute = list(dic = TRUE, cpo = TRUE, waic = TRUE),
-#                       E = inla.stack.data(stk.cov[[l]])$e)
-#     pp.cov.est[[l]] <- inla.spde.result(inla = pp.cov[[l]], name = "i", spde = ufo_spde[[l]], do.transf = TRUE)
-#     out <- l
-#     },
-#     error = function(cond) {
-#       return(0)
-#     }
-#   )
-#   pp.cov.times[[l]] <- Sys.time() - start
-#   if (out == l) {
-#     valid_meshes_INLA <- append(valid_meshes_INLA,l)
-#   }
-# }
-# 
-# tempn <- vector("list", length = length(valid_meshes_INLA))
-# 
-# 
-# 
-# gproj_cov <- tempn
-# g_mean_cov <- tempn
-# g_sd_cov <- tempn
-# 
-# for (k in 1:length(valid_meshes_INLA)) {
-#   g = valid_meshes_INLA[k]
-#   gproj_cov[[k]] <- inla.mesh.projector(mesh_n[[g]], dims = c(1000, 1000))
-#   g_mean_cov[[k]] <- inla.mesh.project(gproj_cov[[k]], pp.cov[[g]]$summary.random$i$mean)
-#   g_sd_cov[[k]] <- inla.mesh.project(gproj_cov[[k]], pp.cov[[g]]$summary.random$i$sd)
-# }
-# 
-# plot_m_cov <- do.call('grid.arrange',
-#                       lapply(g_mean_cov,
-#                              levelplot, col.regions=terrain.colors(16), scales=list(draw=FALSE), 
-#                              main='latent field mean', xlab='', ylab=''))
-# ggsave(path = "ufo_sim_files", filename = "latent_field_mean_cov.png", plot_m_cov,
-#        units = "in", width = 10, height = 10)
-# 
-# 
-# plot_sd_cov <- do.call('grid.arrange',
-#                        lapply(g_sd_cov,
-#                               levelplot, col.regions=terrain.colors(16), scales=list(draw=FALSE), 
-#                               main='latent field SD', xlab='', ylab=''))
-# ggsave(path = "ufo_sim_files", filename = "latent_field_sd_cov.png", plot_sd_cov,
-#        units = "in", width = 10, height = 10)
-# 
-# 
-# 
-# ### --------------------------------------------------------------------------->> Final output w/ covariate CSV file
-# 
-# dir.create("UFO_cov_CSV_files")
-# 
-# list_fixed <- tempn
-# #marg_fixed <- tempn
-# #marg_kappa <- tempn
-# #marg_variance <- tempn
-# #marg_range <- tempn
-# list_dic <- tempn
-# list_waic <- tempn
-# 
-# 
-# for (k in 1:length(valid_meshes_INLA)){
-#   f = valid_meshes_INLA[k]
-#   list_fixed[[k]] <- pp.cov[[f]]$summary.fixed
-#   #marg_fixed[[k]] <- pp.cov[[f]]$marginals.fixed[[1]]
-#   #marg_kappa[[k]] <- pp.cov.est[[f]]$marginals.kappa[[1]]
-#   #marg_variance[[k]] <- pp.cov.est[[f]]$marginals.variance.nominal[[1]]
-#   #marg_range[[k]] <- pp.cov.est[[f]]$marginals.range.nominal[[1]]
-#   list_dic[[k]] <- pp.cov[[f]]$dic$dic
-#   list_waic[[k]] <- pp.cov[[f]]$waic$waic
-# }
-# 
-# ### --------------------------------------------------------------------------->> CSV summary.fixed
-# fixed <- data.frame(matrix(unlist(list_fixed), ncol = 7, byrow = TRUE))
-# colnames(fixed) <- names(pp.res[[1]]$summary.fixed)
-# fixed$Mesh <- paste("Mesh", valid_meshes_INLA, sep = "_")
-# write.csv(fixed, file = "cov_CSV_files/summary_fixed_cov.csv")
-# 
-# 
-# ### --------------------------------------------------------------------------->> CSV marginals.fixed
-# #margfixed <- data.frame(do.call('rbind', marg_fixed))
-# #margfixed$Mesh <- rep(paste("Mesh", valid_meshes_INLA, sep = "_"), each = nrow(pp.res[[1]]$marginals.fixed[[1]]))
-# #write.csv(margfixed, file = "UFO_cov_CSV_files/marginals_fixed_cov.csv")
-# 
-# 
-# ### --------------------------------------------------------------------------->> CSV marginals.log.kappa
-# #margkappa <- data.frame(do.call('rbind', marg_kappa))
-# #margkappa$Mesh <- rep(paste("Mesh", valid_meshes_INLA, sep = "_"), each = nrow(pp.res.est[[1]]$marginals.kappa[[1]]))
-# #write.csv(margkappa, file = "UFO_cov_CSV_files/marginals_kappa_cov.csv")
-# 
-# 
-# ### --------------------------------------------------------------------------->> CSV marginals.log.variance.nominal
-# #margvar <- data.frame(do.call('rbind', marg_variance))
-# #margvar$Mesh <- rep(paste("Mesh", valid_meshes_INLA, sep = "_"), each = nrow(pp.res.est[[1]]$marginals.variance.nominal[[1]]))
-# #write.csv(margvar, file = "UFO_cov_CSV_files/marginals_variance_cov.csv")
-# 
-# 
-# ### --------------------------------------------------------------------------->> CSV marginals.log.range.nominal
-# #margrange <- data.frame(do.call('rbind', marg_range))
-# #margrange$Mesh <- rep(paste("Mesh", valid_meshes_INLA, sep = "_"), each = nrow(pp.res.est[[1]]$marginals.range.nominal[[1]]))
-# #write.csv(margrange, file = "UFO_cov_CSV_files/marginals_range_cov.csv")
-# 
-# 
-# ### --------------------------------------------------------------------------->> CSV DIC
-# dic <- data.frame(matrix(unlist(list_dic), ncol = 1, byrow = TRUE))
-# colnames(dic) <- "DIC"
-# dic$Mesh <- paste("Mesh", valid_meshes_INLA, sep = "_")
-# write.csv(dic, file = "UFO_cov_CSV_files/DIC_cov.csv")
-# 
-# 
-# ### --------------------------------------------------------------------------->> CSV WAIC
-# waic <- data.frame(matrix(unlist(list_waic), ncol = 1, byrow = TRUE))
-# colnames(waic) <- "WAIC"
-# waic$Mesh <- paste("Mesh", valid_meshes_INLA, sep = "_")
-# write.csv(waic, file = "UFO_cov_CSV_files/WAIC_cov.csv")
-# 
-# ### --------------------------------------------------------------------------->> CSV computation time
-# times <- data.frame(matrix(unlist(pp.cov.times), ncol = 1, byrow = TRUE))
-# colnames(times) <- "CompTime"
-# times$Mesh <- paste("Mesh", 1:nrow(mesh_mat), sep = "_")
-# write.csv(times, file = "UFO_cov_CSV_files/Times.csv")
 
 
 

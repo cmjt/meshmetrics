@@ -9,7 +9,6 @@ k <- as.numeric(args[1])
 
 devtools::load_all("stelfi")
 library(sf)
-library(qpdf)
 library(maps)
 library(sp)
 library(INLA)
@@ -26,9 +25,8 @@ library(spatstat)
 ## source required functions 
 #source("functions.r")
 ## usa map and region
-states <- map_data("state")
 usa <- map_data('usa')
-usa_region <- data.frame(Longitude = usa$long, Latitude = usa$lat)
+#usa_region <- data.frame(Longitude = usa$long, Latitude = usa$lat)
 region <- as(sf::st_as_sf(maps::map("usa", fill = TRUE, plot = FALSE)), "Spatial")
 
 ## convert the existing lat-long coordinates to UTM (easting-northing system)
@@ -36,9 +34,9 @@ usa_utm <- spTransform(region,
                        #CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"))
                        CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=km +no_defs"))
 
-sets <- expand.grid(data.frame(beta = c(-9,-7), ## per unit area # -24 # -22
+sets <- expand.grid(data.frame(beta = c(-9,-7.5), ## per unit area # -24 # -22
                                var = c(5, 0.1),
-                               rho = c(50, 10))) # 50,000 10,000
+                               rho = c(100, 50))) # 50,000 10,000
 
 
 ### Construct Simulations
@@ -58,8 +56,26 @@ for (i in 1:nrow(sets)) {
 }
 ## mesh construction (5 for now)
 #tmp <- lapply(seq(200000, 1000000, length.out = 5), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
-tmp <- lapply(seq(200, 1000, length.out = 5), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
-                                                                        max.edge = c(x, 2 * x)))
+tmp <- lapply(seq(150, 1050, length.out = 10), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
+                                                                          max.edge = c(x, 2 * x)))
+
+set.seed(4321)
+points2 <- list()
+for (i in 1:10) {
+  X <- rLGCP("matern", mu = -9.25,
+             var = 0.1, scale = 100, nu = 1,
+             win = win)
+  Lamda <- attr(X, 'Lambda')
+  points2[[i]] <- data.frame(x = X$x, y = X$y)
+}
+
+tmp2 = lapply(seq(150, 1050, length.out = 10), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
+                                                                              loc = points2[[(as.integer(0.01*x - 0.5))]],
+                                                                              cutoff = 0.2*x,
+                                                                              max.edge = c(x, 2 * x)))
+
+tmp = append(tmp, tmp2)
+
 attrs <- lapply(tmp, stelfi:::meshmetrics)
 
 ##  model fitting
@@ -68,10 +84,14 @@ names(results) <- c(paste("bru_", 1:3, sep = ""),"bru_time", paste("stelfi_", 1:
 ## append mesh attributes summaries
 results$mean_radius_edge <- rep(sapply(attrs, function(x) mean(x$triangles$radius_edge)), each = length(points))
 results$sd_radius_edge <- rep(sapply(attrs, function(x) sd(x$triangles$radius_edge)), each = length(points))
+results$uq_radius_edge <- rep(sapply(attrs, function(x) quantile(x$triangles$radius_edge)[4]), each = length(points))
 results$mean_radius_ratio <- rep(sapply(attrs, function(x) mean(x$triangles$radius_ratio)), each = length(points))
 results$sd_radius_ratio <- rep(sapply(attrs, function(x) sd(x$triangles$radius_ratio)), each = length(points))
+results$uq_radius_ratio <- rep(sapply(attrs, function(x) quantile(x$triangles$radius_ratio)[4]), each = length(points))
 results$n_triangles <- rep(sapply(tmp, function(x) x$n), each = length(points))
-results$set <- rep(1:length(points), length(tmp))
+results$true_beta <- rep(sets[,1], times = length(tmp))
+results$true_var <- rep(sets[,2], times = length(tmp))
+results$true_rho <- rep(sets[,3], times = length(tmp))
 
 for (i in 1:length(tmp)) {
   for(j in 1:length(points)) {
@@ -80,7 +100,7 @@ for (i in 1:length(tmp)) {
     ## Define SPDE prior
     matern <- INLA::inla.spde2.pcmatern(tmp[[i]],
                                         prior.sigma = c(1, 0.01),
-                                        prior.range = c(100000, 0.01)
+                                        prior.range = c(100, 0.01)
     )
     
     ## Define domain of the LGCP as well as the model components (spatial SPDE
@@ -112,7 +132,7 @@ for (i in 1:length(tmp)) {
     )
   }
 }
-dir.create("USA_files_km")
+dir.create("USA_files")
 write.csv(results, file = paste("USA_files/res_usa", k, ".csv", sep = ""))
 
 
