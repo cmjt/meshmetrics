@@ -14,9 +14,13 @@ library(rgeos)
 library(lattice)
 library(inlabru)
 # INLA:::inla.binary.install()
+#setwd("GitHub/meshmetrics")
 
-## source required functions 
-#source("functions.r")
+dir.create("UFO_stelfi_maps")
+dir.create("UFO_bru_maps")
+dir.create("UFO_meshes")
+
+
 ## read in data
 ufo <- readr::read_csv("data/ufo.csv")
 ## usa map
@@ -45,10 +49,7 @@ locs <- coordinates(ufo_sp)
 locs <- data.frame(x = locs[,1], y = locs[,2])
 
 ### --------------------------------------------------------------------------->> Mesh Construction 
-### We compare six results for the ufo dataset based on the six different meshes
-### mesh_val <- c(loc, boundary, max.edge, cutoff)
-#source("ufo_mesh.R")
-#tmp <- lapply(seq(200000, 1000000, length.out = 30), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
+
 tmp <- lapply(seq(150, 1050, length.out = 10), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
                                                                                    max.edge = c(x, 2 * x)))
 # create random mesh nodes
@@ -57,8 +58,8 @@ win <- as.owin.SpatialPolygons(usa_utm)
 set.seed(4321)
 points <- list()
 for (i in 1:10) {
-  X <- rLGCP("matern", mu = -9.25,
-             var = 0.1, scale = 100, nu = 1,
+  X <- rLGCP("matern", mu = -10,
+             var = 0.5, scale = 50, nu = 1,
              win = win)
   Lamda <- attr(X, 'Lambda')
   points[[i]] <- data.frame(x = X$x, y = X$y)
@@ -66,7 +67,7 @@ for (i in 1:10) {
 
 tmp2 = lapply(seq(150, 1050, length.out = 10), function(x) INLA::inla.mesh.2d(loc.domain = bound$loc,
                                                                               loc = points[[(as.integer(0.01*x - 0.5))]],
-                                                                              cutoff = 0.2*x,
+                                                                              cutoff = 0.075*x,
                                                                               max.edge = c(x, 2 * x)))
 
 tmp = append(tmp, tmp2)
@@ -84,9 +85,16 @@ results$sd_radius_ratio <- sapply(attrs, function(x) sd(x$triangles$radius_ratio
 results$uq_radius_ratio <- sapply(attrs, function(x) quantile(x$triangles$radius_ratio)[4])
 results$n_triangles <- sapply(tmp, function(x) x$n)
 
+
 points <- locs
 coordinates(locs) <- c("x", "y")
 for (i in 1:length(tmp)) {
+  ## Plot meshes
+  mesh_plot <- plot(tmp[[i]])
+  filename = paste("UFO_mesh_", i, ".png", sep="")
+  ggsave(path = "UFO_meshes", filename = filename, plot = mesh_plot,
+         units = "in", width = 10, height = 10)
+  
   ## Define SPDE prior
   matern <- INLA::inla.spde2.pcmatern(tmp[[i]],
                                       prior.sigma = c(0.1, 0.01),
@@ -105,6 +113,10 @@ for (i in 1:length(tmp)) {
                                         options = list(control.inla = list(int.strategy = "eb")))
     )
     results[i, 1:4] <- c(fit_bru$summary.fixed[, 1], fit_bru$summary.hyperpar[, 1], as.numeric(t_bru[3]))
+    field_plot <- stelfi::show_field(x=fit_bru$summary.random$mySmooth$mean, smesh = tmp[[i]], border = usa_utm)
+    filename <- paste("UFO_field_", i, ".png", sep = "")
+    ggsave(path = "UFO_bru_maps", filename = filename, plot = field_plot,
+           units = "in", width = 10, height = 10)
     },
     error = function(cond) {
       results[i, 1:4] <- rep(NA,4)
@@ -115,6 +127,11 @@ for (i in 1:length(tmp)) {
     {
     t_stelfi <- system.time(fit_stelfi <- stelfi::fit_lgcp(locs = points, sp = usa_utm, smesh = tmp[[i]]))
     results[i, 5:8] <- c(get_coefs(fit_stelfi)[c(1, 4:5), 1], as.numeric(t_stelfi[3]))
+    res <- TMB::sdreport(fit_stelfi)
+    field_plot <- stelfi::show_field(x = res$par.random, smesh = tmp[[i]], border = usa_utm)
+    filename <- paste("UFO_field_", i, ".png", sep = "")
+    ggsave(path = "UFO_stelfi_maps", filename = filename, plot = field_plot,
+           units = "in", width = 10, height = 10)
     },
     error = function(cond) {
       results[i, 5:8] <- rep(NA,4)
