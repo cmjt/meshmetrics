@@ -52,7 +52,7 @@ win <- as.owin.SpatialPolygons(usa_utm)
 ## choose resolution
 set.seed(4321)
 points <- list()
-for (i in 1:5) {
+for (i in 1:10) {
   X <- rLGCP("matern", mu = -9.5,
              var = 0.1, scale = 100, nu = 1,
              win = win)
@@ -155,8 +155,15 @@ coordinates(locs) <- c("x", "y")
 
 for (j in 1:length(tmp)) {
   # plot mesh
-  mesh_plot <- plot(tmp[[i]])
-  filename = paste("UFO_mesh_", i, ".png", sep="")
+  filepath <- paste("UFOPOP_meshes/UFO_mesh_",j, ".jpg", sep="")
+  jpeg(filepath, width = 1440, height = 1440)
+  plot(tmp[[j]])
+  lines(coordinates(usa_utm@polygons[[1]]@Polygons[[1]])[,1], coordinates(usa_utm@polygons[[1]]@Polygons[[1]])[,2], col = "red")
+  dev.off()
+  
+  # plot mesh attributes
+  filename <- paste("UFO_mesh_attrs_",j, ".jpg", sep="")
+  mesh_plot <- stelfi::plot_mesh(tmp[[j]])
   ggsave(path = "UFOPOP_meshes", filename = filename, plot = mesh_plot,
          units = "in", width = 10, height = 10)
   
@@ -178,8 +185,8 @@ for (j in 1:length(tmp)) {
       t_stelfi <- system.time(fit_stelfi <- stelfi::fit_lgcp(locs = points, sp = usa_utm, smesh = tmp[[j]], covariates = weights))
       results[j, 6:10] <- c(get_coefs(fit_stelfi)[c(1, 2, 5:6), 1], as.numeric(t_stelfi[3]))
       res <- TMB::sdreport(fit_stelfi)
-      field_plot <- stelfi::show_field(x = res$par.random, smesh = tmp[[i]], border = usa_utm)
-      filename <- paste("UFO_field_", i, ".png", sep = "")
+      field_plot <- stelfi::show_field(x = res$par.random, smesh = tmp[[j]], border = usa_utm)
+      filename <- paste("UFO_field_", j, ".png", sep = "")
       ggsave(path = "UFOPOP_stelfi_maps", filename = filename, plot = field_plot,
              units = "in", width = 10, height = 10)
     },
@@ -204,8 +211,8 @@ for (j in 1:length(tmp)) {
                                            options = list(control.inla = list(int.strategy = "eb")))
       )
       results[j, 1:5] <- c(fit_bru$summary.fixed[, 1], fit_bru$summary.hyperpar[, 1], as.numeric(t_bru[3]))
-      field_plot <- stelfi::show_field(x=fit_bru$summary.random$mySmooth$mean, smesh = tmp[[i]], border = usa_utm)
-      filename <- paste("UFO_field_", i, ".png", sep = "")
+      field_plot <- stelfi::show_field(x=fit_bru$summary.random$mySmooth$mean, smesh = tmp[[j]], border = usa_utm)
+      filename <- paste("UFO_field_", j, ".png", sep = "")
       ggsave(path = "UFOPOP_bru_maps", filename = filename, plot = field_plot,
              units = "in", width = 10, height = 10)
     },

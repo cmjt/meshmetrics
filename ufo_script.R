@@ -89,11 +89,19 @@ results$n_triangles <- sapply(tmp, function(x) x$n)
 points <- locs
 coordinates(locs) <- c("x", "y")
 for (i in 1:length(tmp)) {
-  ## Plot meshes
-  mesh_plot <- plot(tmp[[i]])
-  filename = paste("UFO_mesh_", i, ".png", sep="")
+  # plot mesh
+  filepath <- paste("UFO_meshes/UFO_mesh_",i, ".jpg", sep="")
+  jpeg(filepath, width = 1440, height = 1440)
+  plot(tmp[[i]])
+  lines(coordinates(usa_utm@polygons[[1]]@Polygons[[1]])[,1], coordinates(usa_utm@polygons[[1]]@Polygons[[1]])[,2], col = "red")
+  dev.off()
+  
+  # plot mesh attributes
+  filename <- paste("UFO_mesh_attrs_",i, ".jpg", sep="")
+  mesh_plot <- stelfi::plot_mesh(tmp[[i]])
   ggsave(path = "UFO_meshes", filename = filename, plot = mesh_plot,
          units = "in", width = 10, height = 10)
+  
   
   ## Define SPDE prior
   matern <- INLA::inla.spde2.pcmatern(tmp[[i]],
